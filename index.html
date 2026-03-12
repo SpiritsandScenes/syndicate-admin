@@ -1,4 +1,18 @@
 <!DOCTYPE html>
+<!--
+  THE SYNDICATE — Murder Mystery Game Platform
+  Copyright (c) 2026 Spirits & Scenes. All rights reserved.
+
+  This software and its contents — including but not limited to game mechanics,
+  scenario text, character designs, clue scripts, voting systems, and all
+  associated assets — are proprietary and confidential to Spirits & Scenes.
+
+  Unauthorized copying, distribution, modification, sublicensing, or commercial
+  use of any part of this software, in whole or in part, without express written
+  permission from Spirits & Scenes, is strictly prohibited.
+
+  Licensing & contact: hudsonsproductions@outlook.com
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -395,14 +409,14 @@ function LoginScreen({ onLogin }) {
           <div style={{ fontSize:9, color:C.muted, fontFamily:"monospace", letterSpacing:2, marginBottom:24, textAlign:"center" }}>
             AUTHORISED PERSONNEL ONLY
           </div>
-          <Input label="Email" value={email} onChange={setEmail} placeholder="User Name" />
+          <Input label="Email" value={email} onChange={setEmail} placeholder="admin@thesyndicate.game" />
           <Input label="Password" value={password} onChange={setPassword} placeholder="••••••••••" />
           {error && <div style={{ fontSize:11, color:C.red, fontFamily:"monospace", marginBottom:14, textAlign:"center" }}>{error}</div>}
           <Btn onClick={handleLogin} disabled={loading} full size="lg">
             {loading ? "AUTHENTICATING..." : "ENTER THE PORTAL"}
           </Btn>
           <div style={{ textAlign:"center", marginTop:16, fontSize:10, color:C.muted, fontFamily:"monospace" }}>
-           
+            Demo: admin@thesyndicate.game / bourbon1924
           </div>
         </Card>
       </div>
