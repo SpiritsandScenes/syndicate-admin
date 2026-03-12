@@ -1,0 +1,2014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="description" content="The Syndicate — Murder Mystery Game Admin Portal" />
+  <meta name="theme-color" content="#08070A" />
+  <title>The Syndicate · Admin Portal</title>
+
+  <!-- Favicon inline -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎭</text></svg>" />
+
+  <!-- React + ReactDOM from CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel Standalone for JSX transpilation in-browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { width: 100%; height: 100%; min-height: 100vh; }
+    body {
+      background: #08070A;
+      color: #D0C8E0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    #root { display: flex; flex-direction: column; }
+
+    /* Loading screen */
+    #loader {
+      position: fixed; inset: 0;
+      background: #08070A;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.4s ease;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    .loader-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      color: #C9A84C;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .loader-sub {
+      font-size: 12px;
+      letter-spacing: 0.15em;
+      color: #7A7090;
+      text-transform: uppercase;
+    }
+    .loader-bar {
+      width: 180px;
+      height: 2px;
+      background: #2A2535;
+      border-radius: 1px;
+      margin-top: 24px;
+      overflow: hidden;
+    }
+    .loader-bar-fill {
+      height: 100%;
+      background: #C9A84C;
+      border-radius: 1px;
+      animation: loadbar 1.8s ease-in-out infinite;
+    }
+    @keyframes loadbar {
+      0%   { width: 0%;   margin-left: 0%; }
+      50%  { width: 60%;  margin-left: 20%; }
+      100% { width: 0%;   margin-left: 100%; }
+    }
+
+    /* Mobile warning for screens under 600px wide in landscape - optional UX hint */
+    @media (max-width: 480px) {
+      body::before {
+        content: "Tip: Best experienced on tablet or desktop";
+        display: block;
+        background: #1a1425;
+        color: #7A7090;
+        font-size: 11px;
+        text-align: center;
+        padding: 6px;
+        letter-spacing: 0.05em;
+      }
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #08070A; }
+    ::-webkit-scrollbar-thumb { background: #2A2535; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3A3550; }
+
+    /* Print styles for invite cards */
+    @media print {
+      #loader, nav, aside { display: none !important; }
+      body { background: white; color: black; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading screen shown while Babel compiles -->
+  <div id="loader">
+    <div class="loader-title">The Syndicate</div>
+    <div class="loader-sub">Loading Admin Portal</div>
+    <div class="loader-bar"><div class="loader-bar-fill"></div></div>
+  </div>
+
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    // ── Destructure React hooks from global ─────────────────────
+    const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+
+// ── Design tokens ─────────────────────────────────────────────────
+const C = {
+  bg:      "#08070A",
+  bgDeep:  "#050406",
+  panel:   "#0F0E14",
+  panelLt: "#16141E",
+  border:  "#2A2535",
+  borderLt:"#3A3550",
+  gold:    "#C9A84C",
+  goldDim: "#7A5F28",
+  cream:   "#F5E6C8",
+  muted:   "#7A7090",
+  faint:   "#2A2535",
+  red:     "#C0392B",
+  redDim:  "#3A0F0A",
+  green:   "#27AE60",
+  greenDim:"#0A2014",
+  blue:    "#2E86C1",
+  blueDim: "#0A1428",
+  purp:    "#8E44AD",
+  purpDim: "#1A0828",
+  amber:   "#E67E22",
+  white:   "#FFFFFF",
+  text:    "#D0C8E0",
+};
+
+// ── Seed data ─────────────────────────────────────────────────────
+const SEED_SCENARIOS = [
+  {
+    id: "s1", name: "The Bourbon Betrayal", setting: "1920s Prohibition Chicago",
+    status: "active", players: 10, lastEdited: "2026-03-10",
+    story: {
+      tagline: "A Night of Blood & Bourbon",
+      venue: "The Gilded Barrel Speakeasy, Chicago",
+      date: "November 3rd, 1927",
+      premise: "The Marchetti Syndicate gathers for their annual closed-door meeting at The Gilded Barrel. Angelo Marchetti, the Don's heir, is found dead in Barrel Room No. 7 before dinner is served. Poisoned. His personal flask. The Don has sealed the building. Nobody leaves until the Syndicate names a killer.",
+      victim: "Angelo Marchetti",
+      victimBackground: "Angelo was the Don's eldest son and heir apparent to the Marchetti Syndicate. Quietly building a case against an embezzler within the organisation. He confronted his killer eight days before the Gathering.",
+      masterTruth: "Dominic Caruso embezzled $41,200 from the family over 18 months via the Blue Flamingo Jazz Club. Angelo discovered the discrepancy in October. Dom sourced pharmaceutical arsenic and swapped Angelo's hip flask at 9:38 PM. Dom stopped the pocket watch manually at 9:47 PM to fabricate an earlier time of death. Rosa Vitale was complicit. Frankie Malone witnessed Dom at 10:15 PM.",
+      hostOpeningScript: "Welcome to The Gilded Barrel. Tonight you are all trusted members of the Marchetti Syndicate. Earlier this evening, Angelo Marchetti was found dead in Barrel Room Number Seven. Poisoned. His personal flask. The Don has sealed the building. Nobody leaves. The killer is in this room. You have five rounds to find them.",
+      winCondition: "Civilians win by voting out the Killer at any point during Rounds 1-5. The Killer wins by surviving all five rounds without being eliminated.",
+    },
+    rounds: [
+      { id:"r1", round:1, title:"The Gathering",        timing:"0:00–0:22", notes:"Trimmed to 22 min — 6 players x 3-4 min speaking. Cut from 35 min to eliminate dead air after ~22 min." },
+      { id:"r2", round:2, title:"The Evidence",         timing:"0:35–0:55", notes:"20 min. Toxicology + stopped watch + new private clues for Tommy and Moreau increase table discussion." },
+      { id:"r3", round:3, title:"The Plot Twist",       timing:"1:05–1:30", notes:"25 min. Ledger reveal is the pivot — give it room. Tommy and Frankie both have private reactions to this." },
+      { id:"r4", round:4, title:"The Final Clues",      timing:"1:40–2:00", notes:"20 min. Handkerchief + tip + Rosa Consigliere reveal mechanic adds 5-8 min of structured drama." },
+      { id:"r5", round:5, title:"The Final Accusation", timing:"2:05–2:30", notes:"25 min — extended from 12. Serafina and Frankie share final clues publicly. Dom defends. Full table debate then vote." },
+    ],
+    characters: [
+      { id:"c1", name:"Dominic Caruso",     avatar:"DC", role:"KILLER",      roleColor:C.red,   position:"Head of Finances",  alibi:"At the bar 10:00–10:20 PM. Barman confirms — imprecisely.", objective:"Survive all 5 rounds. In Round 2, you may state as fact: Aldo Benedetti threatened Angelo two weeks ago. I heard it myself. Redirect all suspicion to Aldo and away from the ledger.", secret:"Embezzled $41,200 via Blue Flamingo. Poisoned flask at 9:38 PM." },
+      { id:"c2", name:"Rosa Vitale",        avatar:"RV", role:"CONSIGLIERE", roleColor:C.amber, position:"Angelo's Secretary", alibi:"Clearing the dining room 9:30–10:15 PM. Staff can confirm.", objective:"Protect Dom. Misdirect. In Round 4 you must stand and announce: I know something about one person at this table. Then whisper your accusation to the host who confirms the role privately to you. Use it to protect Dom.", secret:"Complicit in the embezzlement. Warned Dom about the ledger." },
+      { id:"c3", name:"Frankie Malone",     avatar:"FM", role:"LOOKOUT",     roleColor:C.blue,  position:"Driver / Enforcer", alibi:"Back corridor near cellar stairs 10:00–10:30 PM.", objective:"Stay quiet. Drop hints. Name Dom only if eliminated.", secret:"Saw Dom exit the barrel room at 10:15 PM." },
+      { id:"c4", name:"Serafina Marchetti", avatar:"SM", role:"CIVILIAN",    roleColor:C.green, position:"Angelo's Sister",   alibi:"Angelo's side during toasts, then powder room 10:00 PM.", objective:"Find your brother's killer. Watch who smiles in grief.", secret:"Angelo warned you: 'The man who smiles most in a room of grief.'" },
+      { id:"c5", name:"Father Nico Avelli", avatar:"NA", role:"CIVILIAN",    roleColor:C.green, position:"Family Confessor",  alibi:"Vestibule greeting guests until 9:45 PM. Multiple witnesses.", objective:"Maintain neutrality. You heard Angelo's confession 3 wks ago.", secret:"Angelo confessed fear of betrayal — did not name the person." },
+      { id:"c6", name:"Lena Kowalski",      avatar:"LK", role:"CIVILIAN",    roleColor:C.green, position:"Jazz Singer",       alibi:"On stage 9:00–9:55 PM. Entire room witnessed.", objective:"Protect your own reputation. Angelo owed you money.", secret:"Angelo and you were having an affair. Rosa knew." },
+      { id:"c7", name:"Aldo Benedetti",     avatar:"AB", role:"CIVILIAN",    roleColor:C.green, position:"Rival Bootlegger",  alibi:"Arrived late — 10:05 PM. Car park attendant confirms.", objective:"You are the obvious suspect. Use it strategically.", secret:"You came to confront Angelo about a stolen shipment — not to kill him." },
+      { id:"c8", name:"Tommy Ricci",        avatar:"TR", role:"CIVILIAN",    roleColor:C.green, position:"Debt Collector",    alibi:"Coat room 9:45–10:10 PM. Attendant can confirm.", objective:"Collect what Angelo owed. You have invoice copies.", secret:"Audited Blue Flamingo. Noticed discrepancies but said nothing." },
+      { id:"c9", name:"Celeste Monroe",     avatar:"CM", role:"CIVILIAN",    roleColor:C.green, position:"Society Journalist",alibi:"Interviewing guests openly all evening. Notebook as proof.", objective:"Get the story. You were blackmailing Angelo over his affair.", secret:"You know about Lena. Angelo paid you to stay quiet — until last week." },
+      { id:"c10",name:"Inspector Moreau",   avatar:"VM", role:"CIVILIAN",    roleColor:C.green, position:"Corrupt Detective", alibi:"Examining the barrel room from 10:22 PM. Official capacity.", objective:"Bungle the investigation. You're on the Syndicate's payroll.", secret:"Marchetti pays your mortgage. You will not find this killer." },
+    ],
+    clues: [
+      { id:"cl1",  round:1, type:"dispatch", time:"9:00 PM",  title:"The Gathering Begins",          text:"Angelo Marchetti has been found dead in Barrel Room No. 7. Cause of death: suspected poisoning. The Don has sealed the building. Nobody leaves.",                                                                    private:false, chars:[] },
+      { id:"cl2",  round:1, type:"evidence", time:"9:20 PM",  title:"Physical Evidence — Menu Card", text:"Angelo's menu card recovered from his jacket. On the reverse: a handwritten list of five names, four underlined in pencil, one crossed out in red ink.",                                                              private:false, chars:[] },
+      { id:"cl3",  round:1, type:"private",  time:"9:22 PM",  title:"Private Message — Serafina",    text:"Two weeks before the Gathering, Angelo pulled you aside. He said: 'If anything happens to me at the Barrel — look at the man who smiles most in a room full of grief.'",                                             private:true,  chars:["c4"] },
+      { id:"cl3b", round:1, type:"private",  time:"9:23 PM",  title:"Private Message — Aldo",           text:"You arrived late because you were warned away by an anonymous note: \'Do not come to the Gathering. Leave Chicago tonight.\' You came anyway. You still have the note. Someone wanted you absent — or wanted you to look guilty for being late. You do not know who sent it.", private:true,  chars:["c7"] },
+      { id:"cl3c", round:1, type:"private",  time:"9:24 PM",  title:"Private Message — Lena",           text:"Before you went on stage at 9 PM, you overheard raised voices from Angelo\'s private office. You recognised Dom\'s voice. You could not make out the words but Angelo said \'You have until the Gathering\' before the door closed. You told no one. You were paid to be invisible.", private:true,  chars:["c6"] },
+      { id:"cl4",  round:2, type:"evidence", time:"9:50 PM",  title:"Toxicology Report",             text:"Dr. Moretti's initial findings: pharmaceutical-grade arsenic. Three times the lethal dose. Administered orally. Time of death estimated between 9:40 and 9:50 PM.",                                                  private:false, chars:[] },
+      { id:"cl5",  round:2, type:"evidence", time:"9:53 PM",  title:"The Stopped Watch",             text:"Angelo's pocket watch was found stopped at 9:47 PM. The mechanism was manually wound backwards — fresh scratches on the crown. Someone needed Angelo to appear to die earlier than he did.",                         private:false, chars:[] },
+      { id:"cl6",  round:2, type:"private",  time:"9:55 PM",  title:"Private Message — Serafina",    text:"Angelo consulted Father Nico three weeks ago — privately, outside of confession. Nico has not volunteered this. He may know what Angelo feared.",                                                                       private:true,  chars:["c4"] },
+      { id:"cl7",  round:2, type:"private",  time:"9:55 PM",  title:"Private Message — Frankie",     text:"Before you left for the evening Dom said: 'If anyone asks about the cellar, you were with me at the bar. That's all you need to know.' You weren't with him.",                                                       private:true,  chars:["c3"] },
+      { id:"cl7b", round:2, type:"private",  time:"9:57 PM",  title:"Private Message — Tommy",           text:"Two weeks before the Gathering you came to Angelo's office to collect a debt. Dom was there, hunched over a Blue Flamingo ledger. He closed it the moment he saw you and said: Nothing for you to worry about, Ricci. Angelo looked shaken. You said nothing. You are saying nothing now.", private:true,  chars:["c8"] },
+      { id:"cl7c", round:2, type:"private",  time:"9:58 PM",  title:"Private Message — Inspector Moreau", text:"You received a sealed envelope this morning — Syndicate seal. Dom's handwriting: If the ledger comes up tonight, you found nothing irregular. Your mortgage depends on your discretion. You have not told anyone. You are now acutely aware of what the ledger reveal means.", private:true,  chars:["c10"] },
+      { id:"cl7d", round:2, type:"private",  time:"9:59 PM",  title:"Private Message — Dom",            text:"You are watching the room. Father Nico is evasive but harmless. Celeste is fishing for a story. The one who concerns you is Frankie — he was near the barrel room. And Serafina keeps looking at you. Stay calm. Redirect. In Round 2 you may state as fact: \'Aldo Benedetti threatened Angelo in this very room two weeks ago. I heard it myself.\'", private:true,  chars:["c1"] },
+      { id:"cl8",  round:3, type:"evidence", time:"10:15 PM", title:"PLOT TWIST — Hidden Ledger",    text:"A second ledger found behind a false panel in Angelo's office. It documents 18 months of irregular withdrawals from the Blue Flamingo Jazz Club. Total discrepancy: $41,200. The entries are in Angelo's hand.",    private:false, chars:[] },
+      { id:"cl9",  round:3, type:"private",  time:"10:17 PM", title:"Private Message — Frankie",     text:"Dom has been watching you since the ledger was revealed. You saw him glance at you when the $41,200 figure was read aloud. He then looked away and laughed at something Rosa said. He is managing.",                 private:true,  chars:["c3"] },
+      { id:"cl9b", round:3, type:"private",  time:"10:18 PM", title:"Private Message — Tommy R3",       text:"The ledger. Blue Flamingo. $41,200. That is exactly what you saw Dom reviewing two weeks ago. You said nothing then because you feared the Marchettis. You are saying nothing now for the same reason — but you are terrified Dom knows you saw it.", private:true,  chars:["c8"] },
+      { id:"cl10", round:4, type:"evidence", time:"10:30 PM", title:"Physical Evidence — Handkerchief","text":"A white cotton handkerchief snagged on the barrel room latch — door handle height. Monogrammed initials: D.C.",                                                                                                   private:false, chars:[] },
+      { id:"cl11", round:4, type:"tip",      time:"10:33 PM", title:"Anonymous Tip — All Guests",    text:"A folded note placed on every table: 'The man who counts the family's money. He was at that door. I saw him at 10:15. I am too frightened to say this out loud.'",                                                   private:false, chars:[] },
+      { id:"cl11b",round:4, type:"private",  time:"10:34 PM", title:"Consigliere Mechanic — Rosa",      text:"Your moment has arrived. Stand and announce to the table: I know something about one person here that changes everything. Then whisper your accusation to the host. The host confirms or denies the role to you privately only. Use this to shield Dom or expose whoever threatens him most.", private:true,  chars:["c2"] },
+      { id:"cl12", round:4, type:"private",  time:"10:35 PM", title:"Private Message — Serafina",    text:"You remember now. At 9:36 PM you saw Dom lean across the drinks table. You assumed he was refilling his glass. Angelo's flask was on that table. You looked away.",                                                  private:true,  chars:["c4"] },
+      { id:"cl13", round:5, type:"final",    time:"10:45 PM", title:"Final Clue — Serafina",         text:"Angelo's last written note: 'If you are reading this, Dom found out I knew. I confronted him October 31st. He smiled. He said I was mistaken. Follow the Blue Flamingo money. Tell Serafina.'",                    private:true,  chars:["c4"] },
+      { id:"cl14", round:5, type:"final",    time:"10:45 PM", title:"Final Clue — Frankie",          text:"You have carried this all evening. At 10:15 PM you saw Dominic Caruso exit the barrel room. He was adjusting his jacket. He saw you. He said: 'You didn't see anything, Two-Step.'",                               private:true,  chars:["c3"] },
+      { id:"cl14b",round:5, type:"final",    time:"10:46 PM", title:"Final Clue — Aldo",               text:"The anonymous note warned you away from the Gathering. You kept it. The handwriting — you have seen it before on Syndicate financial memos. The man who writes the family\'s money documents is Dominic Caruso. You are not the killer. And you can now prove someone tried to frame you.", private:true,  chars:["c7"] },
+      { id:"cl14c",round:5, type:"final",    time:"10:47 PM", title:"Final Clue — Lena",               text:"The voices from Angelo\'s office. Dom said: \'You have until the Gathering.\' Angelo\'s answer was silence. You were paid to be invisible — but Angelo is dead and you know what you heard. You are instructed to share this with the table before the final vote.", private:true,  chars:["c6"] },
+      { id:"cl14d",round:5, type:"final",    time:"10:45 PM", title:"Final Instruction — Dom",          text:"The room is turning. Serafina has a note. Frankie is about to speak. You have one move left: confess to the embezzlement only. Admit the money — deny the murder. Say: 'Yes, I took the money. Angelo confronted me. But I did not kill him.' Make them doubt the leap from thief to killer. It is your only chance to survive the final vote.", private:true,  chars:["c1"] },
+      { id:"cl15", round:5, type:"final",    time:"10:46 PM", title:"Final Clue — Tommy",              text:"You cannot stay silent. The ledger. Dom. You saw it two weeks ago. If you say nothing now you are complicit in Angelo's murder. You are instructed to share what you know with the table before the final vote.", private:true,  chars:["c8"] },
+      { id:"cl16", round:5, type:"final",    time:"10:47 PM", title:"Final Clue — Inspector Moreau",   text:"The envelope. The mortgage. The ledger. You are looking at the killer and you have been paid to look away. But Angelo is dead and the Don is watching you. Whatever Dom promised, it is not worth what comes next if you protect a murderer. Speak or stay silent — choose carefully.", private:true,  chars:["c10"] },
+    ],
+    suspects: [
+      { id:"su1", charId:"c1", eliminated:false, eliminatedRound:null },
+      { id:"su2", charId:"c2", eliminated:false, eliminatedRound:null },
+      { id:"su3", charId:"c3", eliminated:false, eliminatedRound:null },
+      { id:"su4", charId:"c4", eliminated:false, eliminatedRound:null },
+      { id:"su5", charId:"c5", eliminated:false, eliminatedRound:null },
+      { id:"su6", charId:"c6", eliminated:true,  eliminatedRound:3 },
+      { id:"su7", charId:"c7", eliminated:true,  eliminatedRound:2 },
+      { id:"su8", charId:"c8", eliminated:false, eliminatedRound:null },
+      { id:"su9", charId:"c9", eliminated:false, eliminatedRound:null },
+      { id:"su10",charId:"c10",eliminated:false, eliminatedRound:null },
+    ],
+    players: [
+      { id:"p1", name:"Sarah Chen",      code:"MALT-7842", character:"c4", joined:true,  lastSeen:"2 min ago" },
+      { id:"p2", name:"James Whitmore",  code:"RYES-3319", character:"c7", joined:true,  lastSeen:"4 min ago" },
+      { id:"p3", name:"Priya Nair",      code:"CORN-5561", character:"c6", joined:true,  lastSeen:"1 min ago" },
+      { id:"p4", name:"Marcus Webb",     code:"MASH-9274", character:"c1", joined:true,  lastSeen:"6 min ago" },
+      { id:"p5", name:"Elena Sousa",     code:"STILL-1138",character:"c3", joined:false, lastSeen:"Never" },
+      { id:"p6", name:"Tom Alcott",      code:"CASK-4420", character:"c8", joined:true,  lastSeen:"3 min ago" },
+    ],
+  },
+  {
+    id: "s2", name: "The Last Hand", setting: "1920s Riverboat Casino",
+    status: "draft", players: 8, lastEdited: "2026-02-28",
+    rounds: [], characters: [], clues: [], suspects: [], players: [],
+  },
+];
+
+const CLUE_TYPES = ["dispatch","evidence","private","tip","final"];
+const ROLE_TYPES  = ["CIVILIAN","KILLER","CONSIGLIERE","LOOKOUT"];
+const ROLE_COLORS = { CIVILIAN:C.green, KILLER:C.red, CONSIGLIERE:C.amber, LOOKOUT:C.blue };
+
+// ── Utilities ─────────────────────────────────────────────────────
+function uid() { return Math.random().toString(36).slice(2,9); }
+function fmtDate(d) { return new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
+
+// ── Small reusable UI atoms ───────────────────────────────────────
+function Badge({ text, color=C.gold, small=false }) {
+  return (
+    <span style={{ background:`${color}18`, border:`1px solid ${color}44`, color,
+      fontSize:small?8:9, fontFamily:"monospace", letterSpacing:1.2,
+      padding:small?"1px 5px":"2px 8px", borderRadius:2, textTransform:"uppercase", whiteSpace:"nowrap" }}>
+      {text}
+    </span>
+  );
+}
+
+function Btn({ children, onClick, variant="primary", size="md", disabled=false, full=false }) {
+  const bg = {
+    primary: `linear-gradient(135deg, ${C.gold}, #A87830)`,
+    danger:  `linear-gradient(135deg, ${C.red}, #8A1A0A)`,
+    ghost:   "transparent",
+    subtle:  C.faint,
+  }[variant];
+  const col = variant==="ghost" ? C.muted : variant==="subtle" ? C.text : C.bg;
+  const border = variant==="ghost" ? `1px solid ${C.border}` : variant==="subtle" ? `1px solid ${C.borderLt}` : "none";
+  const pad = size==="sm" ? "5px 12px" : size==="lg" ? "12px 28px" : "8px 18px";
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      background: disabled ? C.faint : bg, border, color: disabled ? C.muted : col,
+      fontSize: size==="sm"?10:12, fontFamily:"monospace", letterSpacing:1.2,
+      padding:pad, borderRadius:4, cursor:disabled?"not-allowed":"pointer",
+      fontWeight:"bold", width:full?"100%":undefined, transition:"opacity 0.15s",
+      opacity: disabled ? 0.5 : 1,
+    }}>{children}</button>
+  );
+}
+
+function Input({ value, onChange, placeholder, multiline=false, rows=3, label, hint }) {
+  const shared = {
+    width:"100%", background:C.bg, border:`1px solid ${C.border}`,
+    borderRadius:4, padding:"9px 12px", color:C.text,
+    fontSize:12, fontFamily:"monospace",
+    outline:"none", resize:"vertical", boxSizing:"border-box",
+    transition:"border-color 0.15s",
+  };
+  return (
+    <div style={{ marginBottom:14 }}>
+      {label && <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>{label.toUpperCase()}</div>}
+      {multiline
+        ? <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={shared} />
+        : <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={shared} />
+      }
+      {hint && <div style={{ fontSize:10, color:C.muted, marginTop:4 }}>{hint}</div>}
+    </div>
+  );
+}
+
+function Select({ value, onChange, options, label }) {
+  return (
+    <div style={{ marginBottom:14 }}>
+      {label && <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>{label.toUpperCase()}</div>}
+      <select value={value} onChange={e=>onChange(e.target.value)} style={{
+        width:"100%", background:C.bg, border:`1px solid ${C.border}`,
+        borderRadius:4, padding:"9px 12px", color:C.text,
+        fontSize:12, fontFamily:"monospace", outline:"none",
+      }}>
+        {options.map(o => <option key={o.value||o} value={o.value||o}>{o.label||o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function Card({ children, style={} }) {
+  return (
+    <div style={{ background:C.panel, border:`1px solid ${C.border}`, borderRadius:8, ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function SectionHead({ title, action, actionLabel, actionVariant="primary" }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+      <div style={{ fontSize:16, color:C.cream, fontFamily:"'Playfair Display',serif", fontWeight:"700" }}>{title}</div>
+      {action && <Btn onClick={action} size="sm" variant={actionVariant}>{actionLabel}</Btn>}
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, body, action, actionLabel }) {
+  return (
+    <div style={{ textAlign:"center", padding:"48px 24px", color:C.muted }}>
+      <div style={{ fontSize:36, marginBottom:12, opacity:0.4 }}>{icon}</div>
+      <div style={{ fontSize:14, color:C.text, marginBottom:8 }}>{title}</div>
+      <div style={{ fontSize:12, marginBottom:action?20:0, lineHeight:1.6 }}>{body}</div>
+      {action && <Btn onClick={action} size="sm">{actionLabel}</Btn>}
+    </div>
+  );
+}
+
+function Toast({ msg, type="success", onClose }) {
+  useEffect(() => { const t=setTimeout(onClose,3000); return ()=>clearTimeout(t); }, []);
+  return (
+    <div style={{
+      position:"fixed", bottom:24, right:24, zIndex:9999,
+      background:type==="success"?C.greenDim:C.redDim,
+      border:`1px solid ${type==="success"?C.green:C.red}`,
+      color:type==="success"?C.green:C.red,
+      padding:"10px 20px", borderRadius:6, fontFamily:"monospace", fontSize:11,
+      letterSpacing:1, boxShadow:"0 4px 20px rgba(0,0,0,0.5)",
+      animation:"slideUp 0.3s ease",
+    }}>{type==="success"?"✓":  "✕"}  {msg}
+      <style>{`@keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// LOGIN SCREEN
+// ══════════════════════════════════════════════════════════════════
+function LoginScreen({ onLogin }) {
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
+
+  function handleLogin() {
+    if (!email || !password) { setError("Enter your credentials."); return; }
+    if (email !== "admin@thesyndicate.game" || password !== "bourbon1924") {
+      setError("Invalid credentials. Try admin@thesyndicate.game / bourbon1924");
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => onLogin(), 900);
+  }
+
+  return (
+    <div style={{
+      minHeight:"100vh", background:`radial-gradient(ellipse at 50% 0%, #1A0E2A 0%, ${C.bgDeep} 65%)`,
+      display:"flex", alignItems:"center", justifyContent:"center",
+      fontFamily:"'Playfair Display',serif",
+    }}>
+      <div style={{ width:380 }}>
+        {/* Logo */}
+        <div style={{ textAlign:"center", marginBottom:40 }}>
+          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:6, marginBottom:10 }}>EST. 1924</div>
+          <div style={{ fontSize:44, fontWeight:"700", color:C.white, letterSpacing:3, lineHeight:1 }}>THE SYNDICATE</div>
+          <div style={{ fontSize:11, color:C.gold, fontFamily:"monospace", letterSpacing:4, marginTop:8 }}>ADMIN PORTAL</div>
+          <div style={{ display:"flex", alignItems:"center", gap:8, margin:"16px 0 0" }}>
+            <div style={{ flex:1, height:1, background:`linear-gradient(to right,transparent,${C.gold}44)` }} />
+            <div style={{ width:6, height:6, background:C.gold, transform:"rotate(45deg)" }} />
+            <div style={{ flex:1, height:1, background:`linear-gradient(to left,transparent,${C.gold}44)` }} />
+          </div>
+        </div>
+
+        <Card style={{ padding:"32px 32px 28px" }}>
+          <div style={{ fontSize:9, color:C.muted, fontFamily:"monospace", letterSpacing:2, marginBottom:24, textAlign:"center" }}>
+            AUTHORISED PERSONNEL ONLY
+          </div>
+          <Input label="Email" value={email} onChange={setEmail} placeholder="admin@thesyndicate.game" />
+          <Input label="Password" value={password} onChange={setPassword} placeholder="••••••••••" />
+          {error && <div style={{ fontSize:11, color:C.red, fontFamily:"monospace", marginBottom:14, textAlign:"center" }}>{error}</div>}
+          <Btn onClick={handleLogin} disabled={loading} full size="lg">
+            {loading ? "AUTHENTICATING..." : "ENTER THE PORTAL"}
+          </Btn>
+          <div style={{ textAlign:"center", marginTop:16, fontSize:10, color:C.muted, fontFamily:"monospace" }}>
+            Demo: admin@thesyndicate.game / bourbon1924
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SCENARIO MANAGER
+// ══════════════════════════════════════════════════════════════════
+function ScenarioManager({ scenarios, onSelect, onAdd, onDelete, activeId }) {
+  return (
+    <div>
+      <SectionHead title="Scenarios" action={onAdd} actionLabel="+ New Scenario" />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:14 }}>
+        {scenarios.map(s => (
+          <Card key={s.id} style={{ padding:20, cursor:"pointer", border:`1px solid ${s.id===activeId?C.gold+"55":C.border}`, transition:"border-color 0.2s" }}
+            onClick={() => onSelect(s.id)}>
+            <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:12 }}>
+              <div>
+                <div style={{ fontSize:14, color:C.cream, fontWeight:"700", marginBottom:4 }}>{s.name}</div>
+                <div style={{ fontSize:11, color:C.muted, fontFamily:"monospace" }}>{s.setting}</div>
+              </div>
+              <Badge text={s.status} color={s.status==="active"?C.green:C.amber} />
+            </div>
+            <div style={{ display:"flex", gap:16, fontSize:11, color:C.muted, fontFamily:"monospace", marginBottom:16 }}>
+              <span>{s.characters?.length||0} chars</span>
+              <span>{s.clues?.length||0} clues</span>
+              <span>{s.rounds?.length||0} rounds</span>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div style={{ fontSize:10, color:C.muted, fontFamily:"monospace" }}>Edited {fmtDate(s.lastEdited)}</div>
+              <div style={{ display:"flex", gap:8 }}>
+                <Btn onClick={e=>{e.stopPropagation();onSelect(s.id);}} size="sm">Open</Btn>
+                {s.id!=="s1" && <Btn onClick={e=>{e.stopPropagation();onDelete(s.id);}} size="sm" variant="ghost">Delete</Btn>}
+              </div>
+            </div>
+          </Card>
+        ))}
+        {/* Add card */}
+        <div onClick={onAdd} style={{
+          border:`2px dashed ${C.border}`, borderRadius:8, padding:20,
+          display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+          cursor:"pointer", minHeight:160, gap:8, color:C.muted, transition:"border-color 0.2s",
+        }}>
+          <div style={{ fontSize:28, opacity:0.4 }}>＋</div>
+          <div style={{ fontSize:11, fontFamily:"monospace", letterSpacing:1 }}>NEW SCENARIO</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ROUND EDITOR
+// ══════════════════════════════════════════════════════════════════
+function RoundEditor({ rounds, onChange }) {
+  const [editing, setEditing] = useState(null);
+  const [draft, setDraft]     = useState(null);
+
+  function startEdit(r) { setEditing(r.id); setDraft({...r}); }
+  function cancelEdit() { setEditing(null); setDraft(null); }
+  function saveEdit() {
+    onChange(rounds.map(r => r.id===draft.id ? draft : r));
+    cancelEdit();
+  }
+  function addRound() {
+    const newR = { id:uid(), round:rounds.length+1, title:"New Round", timing:"0:00–0:00", notes:"" };
+    onChange([...rounds, newR]);
+    startEdit(newR);
+  }
+  function deleteRound(id) { onChange(rounds.filter(r=>r.id!==id)); }
+
+  return (
+    <div>
+      <SectionHead title="Round Structure" action={addRound} actionLabel="+ Add Round" />
+      {rounds.length===0 && <EmptyState icon="⏱" title="No rounds yet" body="Add your first round to define the game structure." action={addRound} actionLabel="+ Add Round" />}
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {rounds.map((r,i) => (
+          <Card key={r.id} style={{ padding:0, overflow:"hidden" }}>
+            {editing===r.id ? (
+              <div style={{ padding:20 }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                  <Input label="Round Number" value={String(draft.round)} onChange={v=>setDraft({...draft,round:Number(v)})} />
+                  <Input label="Timing" value={draft.timing} onChange={v=>setDraft({...draft,timing:v})} placeholder="0:00–0:00" />
+                </div>
+                <Input label="Title" value={draft.title} onChange={v=>setDraft({...draft,title:v})} />
+                <Input label="Host Notes" value={draft.notes} onChange={v=>setDraft({...draft,notes:v})} multiline rows={2} />
+                <div style={{ display:"flex", gap:8 }}>
+                  <Btn onClick={saveEdit} size="sm">Save</Btn>
+                  <Btn onClick={cancelEdit} size="sm" variant="ghost">Cancel</Btn>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display:"flex", alignItems:"center", gap:16, padding:"14px 18px" }}>
+                <div style={{ width:32, height:32, borderRadius:"50%", background:`${C.gold}18`, border:`1.5px solid ${C.gold}44`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontFamily:"monospace", color:C.gold, fontWeight:"bold", flexShrink:0 }}>{r.round}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, color:C.cream, fontWeight:"600", marginBottom:2 }}>{r.title}</div>
+                  <div style={{ fontSize:10, color:C.muted, fontFamily:"monospace" }}>{r.timing} {r.notes && `— ${r.notes}`}</div>
+                </div>
+                <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+                  <Btn onClick={()=>startEdit(r)} size="sm" variant="ghost">Edit</Btn>
+                  <Btn onClick={()=>deleteRound(r.id)} size="sm" variant="ghost">✕</Btn>
+                </div>
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CHARACTER EDITOR
+// ══════════════════════════════════════════════════════════════════
+function CharacterEditor({ characters, onChange }) {
+  const [selected, setSelected] = useState(null);
+  const [draft, setDraft]       = useState(null);
+
+  function select(c) { setSelected(c.id); setDraft({...c}); }
+  function save() {
+    onChange(characters.map(c => c.id===draft.id ? draft : c));
+    setDraft({...draft});
+  }
+  function addChar() {
+    const c = { id:uid(), name:"New Character", avatar:"NC", role:"CIVILIAN", roleColor:C.green, position:"", alibi:"", objective:"", secret:"" };
+    onChange([...characters, c]);
+    select(c);
+  }
+  function deleteChar(id) {
+    onChange(characters.filter(c=>c.id!==id));
+    if (selected===id) { setSelected(null); setDraft(null); }
+  }
+
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"240px 1fr", gap:16, minHeight:500 }}>
+      {/* Left list */}
+      <div>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2 }}>CHARACTERS ({characters.length})</div>
+          <Btn onClick={addChar} size="sm">+</Btn>
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+          {characters.map(c => (
+            <div key={c.id} onClick={()=>select(c)} style={{
+              background: selected===c.id ? `${C.gold}18` : C.panel,
+              border:`1px solid ${selected===c.id?C.gold+"55":C.border}`,
+              borderRadius:6, padding:"10px 12px", cursor:"pointer",
+              display:"flex", alignItems:"center", gap:10, transition:"all 0.15s",
+            }}>
+              <div style={{ width:30, height:30, borderRadius:"50%", background:`${ROLE_COLORS[c.role]||C.green}22`, border:`1.5px solid ${ROLE_COLORS[c.role]||C.green}55`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, color:C.cream, flexShrink:0 }}>{c.avatar}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:11, color:C.cream, fontWeight:"600", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.name}</div>
+                <Badge text={c.role} color={ROLE_COLORS[c.role]||C.green} small />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right editor */}
+      {draft ? (
+        <Card style={{ padding:22 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+            <div style={{ fontSize:14, color:C.cream, fontWeight:"700" }}>{draft.name||"New Character"}</div>
+            <Btn onClick={()=>deleteChar(draft.id)} size="sm" variant="danger">Delete</Btn>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            <Input label="Full Name" value={draft.name} onChange={v=>setDraft({...draft,name:v})} />
+            <Input label="Avatar (2 letters)" value={draft.avatar} onChange={v=>setDraft({...draft,avatar:v.slice(0,2).toUpperCase()})} />
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            <Select label="Role" value={draft.role} onChange={v=>setDraft({...draft,role:v,roleColor:ROLE_COLORS[v]||C.green})} options={ROLE_TYPES.map(r=>({value:r,label:r}))} />
+            <Input label="Position / Title" value={draft.position} onChange={v=>setDraft({...draft,position:v})} />
+          </div>
+          <Input label="Alibi" value={draft.alibi} onChange={v=>setDraft({...draft,alibi:v})} multiline rows={2} hint="What this character tells others about their whereabouts" />
+          <Input label="Objective" value={draft.objective} onChange={v=>setDraft({...draft,objective:v})} multiline rows={2} hint="Shown only to the player — their goal for the evening" />
+          <Input label="Secret" value={draft.secret} onChange={v=>setDraft({...draft,secret:v})} multiline rows={2} hint="Hidden behind tap-to-reveal in the player app" />
+          <Btn onClick={save} full>Save Character</Btn>
+        </Card>
+      ) : (
+        <Card style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <EmptyState icon="🎭" title="Select a character" body="Choose a character from the list to edit their details." />
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CLUE EDITOR
+// ══════════════════════════════════════════════════════════════════
+const TYPE_COLORS = { dispatch:C.gold, evidence:C.red, private:C.purp, tip:"#608060", final:C.amber };
+
+function ImageUploader({ image, onChange }) {
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError]       = useState("");
+  const inputRef = useRef(null);
+
+  function processFile(file) {
+    setError("");
+    if (!file) return;
+    if (!["image/jpeg","image/png","image/jpg"].includes(file.type)) {
+      setError("Only JPG and PNG files are accepted."); return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      setError(`File too large: ${(file.size/1024/1024).toFixed(1)}MB. Maximum is 3MB.`); return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => onChange({ src: e.target.result, name: file.name, size: file.size, type: file.type });
+    reader.readAsDataURL(file);
+  }
+
+  function handleDrop(e) {
+    e.preventDefault(); setDragOver(false);
+    processFile(e.dataTransfer.files[0]);
+  }
+
+  const fmtSize = bytes => bytes < 1024*1024 ? `${(bytes/1024).toFixed(0)}KB` : `${(bytes/1024/1024).toFixed(1)}MB`;
+
+  return (
+    <div style={{ marginBottom:16 }}>
+      <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>EVIDENCE IMAGE</div>
+      <div style={{ fontSize:10, color:C.muted, marginBottom:10 }}>JPG or PNG, max 3MB. Shown to players below the clue text when they receive this evidence.</div>
+
+      {image?.src ? (
+        // ── Image preview ───────────────────────────────────────
+        <div style={{ border:`1px solid ${C.gold}44`, borderRadius:6, overflow:"hidden", background:C.bg }}>
+          {/* Aged paper / vignette overlay effect */}
+          <div style={{ position:"relative" }}>
+            <img src={image.src} alt={image.name} style={{ width:"100%", maxHeight:240, objectFit:"cover", display:"block", filter:"sepia(20%) contrast(1.05)" }} />
+            <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse at center, transparent 50%, rgba(8,7,10,0.5) 100%)", pointerEvents:"none" }} />
+            <div style={{ position:"absolute", top:8, right:8, display:"flex", gap:6 }}>
+              <div style={{ background:"rgba(8,7,10,0.75)", border:`1px solid ${C.border}`, borderRadius:3, padding:"3px 8px", fontSize:9, color:C.gold, fontFamily:"monospace", letterSpacing:1 }}>
+                {fmtSize(image.size)}
+              </div>
+            </div>
+          </div>
+          <div style={{ padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between", borderTop:`1px solid ${C.border}` }}>
+            <div>
+              <div style={{ fontSize:11, color:C.cream, marginBottom:1 }}>{image.name}</div>
+              <div style={{ fontSize:9, color:C.muted, fontFamily:"monospace" }}>{image.type} · {fmtSize(image.size)}</div>
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <Btn onClick={()=>inputRef.current?.click()} size="sm" variant="ghost">Replace</Btn>
+              <Btn onClick={()=>onChange(null)} size="sm" variant="danger">Remove</Btn>
+            </div>
+          </div>
+        </div>
+      ) : (
+        // ── Drop zone ──────────────────────────────────────────
+        <div
+          onClick={()=>inputRef.current?.click()}
+          onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+          onDragLeave={()=>setDragOver(false)}
+          onDrop={handleDrop}
+          style={{
+            border:`2px dashed ${dragOver?C.gold:C.border}`,
+            borderRadius:6, padding:"28px 20px", textAlign:"center",
+            cursor:"pointer", background:dragOver?`${C.gold}08`:C.bg,
+            transition:"all 0.2s",
+          }}
+        >
+          <div style={{ fontSize:28, marginBottom:10, opacity:0.4 }}>🖼</div>
+          <div style={{ fontSize:12, color:C.text, marginBottom:4 }}>Drop image here or click to browse</div>
+          <div style={{ fontSize:10, color:C.muted, fontFamily:"monospace" }}>JPG · PNG · Max 3MB</div>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ marginTop:8, padding:"7px 12px", background:C.redDim, border:`1px solid ${C.red}44`, borderRadius:4, fontSize:11, color:C.red, fontFamily:"monospace" }}>
+          ✕  {error}
+        </div>
+      )}
+
+      <input ref={inputRef} type="file" accept="image/jpeg,image/png" style={{ display:"none" }}
+        onChange={e=>processFile(e.target.files[0])} />
+    </div>
+  );
+}
+
+function ClueEditor({ clues, characters, rounds, onChange }) {
+  const [selected, setSelected] = useState(null);
+  const [draft, setDraft]       = useState(null);
+  const [filterRound, setFilterRound] = useState("all");
+  const [filterType,  setFilterType]  = useState("all");
+  const [imgExpanded, setImgExpanded] = useState(false);
+
+  function select(c) { setSelected(c.id); setDraft({...c, chars:[...c.chars]}); setImgExpanded(false); }
+  function save() {
+    onChange(clues.map(c => c.id===draft.id ? draft : c));
+    setDraft({...draft});
+  }
+  function addClue() {
+    const c = { id:uid(), round:1, type:"evidence", time:"9:00 PM", title:"New Clue", text:"", private:false, chars:[], image:null };
+    onChange([...clues, c]);
+    select(c);
+  }
+  function deleteClue(id) {
+    onChange(clues.filter(c=>c.id!==id));
+    if (selected===id) { setSelected(null); setDraft(null); }
+  }
+  function toggleChar(cid) {
+    const list = draft.chars.includes(cid) ? draft.chars.filter(x=>x!==cid) : [...draft.chars,cid];
+    setDraft({...draft, chars:list});
+  }
+
+  const visible = clues.filter(c =>
+    (filterRound==="all" || String(c.round)===filterRound) &&
+    (filterType==="all"  || c.type===filterType)
+  );
+
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"300px 1fr", gap:16, minHeight:500 }}>
+      {/* Left */}
+      <div>
+        <div style={{ display:"flex", gap:6, marginBottom:10 }}>
+          <select value={filterRound} onChange={e=>setFilterRound(e.target.value)} style={{ flex:1, background:C.bg, border:`1px solid ${C.border}`, color:C.text, borderRadius:4, padding:"6px 8px", fontSize:10, fontFamily:"monospace" }}>
+            <option value="all">All Rounds</option>
+            {rounds.map(r=><option key={r.id} value={String(r.round)}>Round {r.round}</option>)}
+          </select>
+          <select value={filterType} onChange={e=>setFilterType(e.target.value)} style={{ flex:1, background:C.bg, border:`1px solid ${C.border}`, color:C.text, borderRadius:4, padding:"6px 8px", fontSize:10, fontFamily:"monospace" }}>
+            <option value="all">All Types</option>
+            {CLUE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2 }}>{visible.length} CLUES</div>
+          <Btn onClick={addClue} size="sm">+</Btn>
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:5, maxHeight:560, overflowY:"auto" }}>
+          {visible.map(c => {
+            const tc = TYPE_COLORS[c.type]||C.gold;
+            return (
+              <div key={c.id} onClick={()=>select(c)} style={{
+                background:selected===c.id?`${tc}10`:C.panel,
+                border:`1px solid ${selected===c.id?tc+"44":C.border}`,
+                borderLeft:`3px solid ${tc}`,
+                borderRadius:"0 6px 6px 0",
+                cursor:"pointer", transition:"all 0.15s",
+                overflow:"hidden",
+              }}>
+                {/* Thumbnail strip if image exists */}
+                {c.image?.src && (
+                  <div style={{ height:52, overflow:"hidden", position:"relative" }}>
+                    <img src={c.image.src} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", filter:"sepia(30%) brightness(0.7)" }} />
+                    <div style={{ position:"absolute", inset:0, background:`linear-gradient(to right, ${tc}22, transparent)` }} />
+                    <div style={{ position:"absolute", bottom:4, right:6, fontSize:8, color:C.gold, fontFamily:"monospace", background:"rgba(8,7,10,0.7)", padding:"1px 5px", borderRadius:2 }}>IMG</div>
+                  </div>
+                )}
+                <div style={{ padding:"9px 12px" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                    <Badge text={c.type} color={tc} small />
+                    <span style={{ fontSize:9, color:C.muted, fontFamily:"monospace" }}>R{c.round} · {c.time}</span>
+                  </div>
+                  <div style={{ fontSize:11, color:C.cream, fontWeight:"600", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.title}</div>
+                  {c.private && <div style={{ fontSize:9, color:C.purp, fontFamily:"monospace", marginTop:2 }}>🔒 {c.chars.length} recipient{c.chars.length!==1?"s":""}</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Right */}
+      {draft ? (
+        <Card style={{ padding:22, overflowY:"auto", maxHeight:"80vh" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+            <div style={{ fontSize:14, color:C.cream, fontWeight:"700" }}>{draft.title||"New Clue"}</div>
+            <Btn onClick={()=>deleteClue(draft.id)} size="sm" variant="danger">Delete</Btn>
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+            <Select label="Round" value={String(draft.round)} onChange={v=>setDraft({...draft,round:Number(v)})} options={rounds.map(r=>({value:String(r.round),label:`Round ${r.round} — ${r.title}`}))} />
+            <Select label="Type" value={draft.type} onChange={v=>setDraft({...draft,type:v,private:v==="private"||v==="final"})} options={CLUE_TYPES.map(t=>({value:t,label:t}))} />
+            <Input label="Time" value={draft.time} onChange={v=>setDraft({...draft,time:v})} placeholder="9:00 PM" />
+          </div>
+          <Input label="Title" value={draft.title} onChange={v=>setDraft({...draft,title:v})} />
+          <Input label="Clue Text" value={draft.text} onChange={v=>setDraft({...draft,text:v})} multiline rows={4} hint="Exactly as it will appear on the player's device" />
+
+          {/* ── Image uploader ─────────────────────────────────── */}
+          <ImageUploader image={draft.image||null} onChange={img=>setDraft({...draft,image:img})} />
+
+          {/* Player preview of this clue */}
+          {(draft.text || draft.image) && (
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:8 }}>PLAYER PREVIEW</div>
+              <div style={{
+                background: draft.private?"#0E0414":"#120A02",
+                border:`1px solid ${TYPE_COLORS[draft.type]||C.gold}44`,
+                borderLeft:`3px solid ${TYPE_COLORS[draft.type]||C.gold}`,
+                borderRadius:"0 8px 8px 0", overflow:"hidden",
+              }}>
+                {/* Image in preview */}
+                {draft.image?.src && (
+                  <div style={{ position:"relative", cursor:"pointer" }} onClick={()=>setImgExpanded(x=>!x)}>
+                    <img src={draft.image.src} alt={draft.title}
+                      style={{ width:"100%", maxHeight: imgExpanded?400:160, objectFit: imgExpanded?"contain":"cover", display:"block", filter:"sepia(15%) contrast(1.05)", background:"#000", transition:"max-height 0.3s ease" }} />
+                    <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse at center, transparent 60%, rgba(8,7,10,0.4) 100%)", pointerEvents:"none" }} />
+                    <div style={{ position:"absolute", bottom:8, right:8, background:"rgba(8,7,10,0.75)", border:`1px solid ${C.gold}44`, borderRadius:3, padding:"3px 8px", fontSize:8, color:C.gold, fontFamily:"monospace", letterSpacing:1 }}>
+                      {imgExpanded?"CLICK TO COLLAPSE":"CLICK TO EXPAND"}
+                    </div>
+                    {/* Aged paper corner fold */}
+                    <div style={{ position:"absolute", top:0, left:0, width:0, height:0, borderStyle:"solid", borderWidth:"20px 20px 0 0", borderColor:`${C.gold}33 transparent transparent transparent` }} />
+                  </div>
+                )}
+                <div style={{ padding:"10px 14px" }}>
+                  <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:5 }}>
+                    <span style={{ fontSize:8, color:TYPE_COLORS[draft.type]||C.gold, fontFamily:"monospace", letterSpacing:1.5 }}>{draft.type.toUpperCase()}</span>
+                    {draft.private && <span style={{ fontSize:7, color:C.purp, fontFamily:"monospace", background:`${C.purp}22`, border:`1px solid ${C.purp}44`, padding:"1px 5px", borderRadius:2 }}>ONLY YOU</span>}
+                    <span style={{ fontSize:8, color:C.muted, fontFamily:"monospace", marginLeft:"auto" }}>{draft.time}</span>
+                  </div>
+                  <div style={{ fontSize:13, color:C.cream, fontWeight:"600", marginBottom:5, fontFamily:"'Playfair Display',serif" }}>{draft.title||"Untitled"}</div>
+                  <div style={{ fontSize:11, color:draft.private?"#C0A0E0":C.muted, lineHeight:1.6, fontStyle:draft.private?"italic":"normal" }}>{draft.text||"No text yet."}</div>
+                </div>
+              </div>
+              <div style={{ fontSize:9, color:C.muted, fontFamily:"monospace", marginTop:5, textAlign:"right" }}>↑ This is exactly what players will see on their device</div>
+            </div>
+          )}
+
+          {/* Private toggle */}
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+            <div onClick={()=>setDraft({...draft,private:!draft.private})} style={{
+              width:36, height:20, borderRadius:10, background:draft.private?C.purp:C.faint,
+              position:"relative", cursor:"pointer", transition:"background 0.2s",
+            }}>
+              <div style={{ position:"absolute", top:3, left:draft.private?19:3, width:14, height:14, borderRadius:"50%", background:C.white, transition:"left 0.2s" }} />
+            </div>
+            <div>
+              <div style={{ fontSize:11, color:C.text }}>Private clue</div>
+              <div style={{ fontSize:10, color:C.muted }}>Only delivered to selected characters</div>
+            </div>
+          </div>
+
+          {/* Recipient selector */}
+          {draft.private && (
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:8 }}>RECIPIENTS</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {characters.map(ch => {
+                  const active = draft.chars.includes(ch.id);
+                  return (
+                    <div key={ch.id} onClick={()=>toggleChar(ch.id)} style={{
+                      background:active?`${ROLE_COLORS[ch.role]||C.green}22`:C.faint,
+                      border:`1px solid ${active?ROLE_COLORS[ch.role]||C.green:C.border}`,
+                      borderRadius:4, padding:"4px 10px", cursor:"pointer",
+                      display:"flex", alignItems:"center", gap:6,
+                    }}>
+                      <div style={{ width:16, height:16, borderRadius:"50%", background:`${ROLE_COLORS[ch.role]||C.green}33`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:7, color:C.cream }}>{ch.avatar}</div>
+                      <span style={{ fontSize:10, color:active?C.cream:C.muted, fontFamily:"monospace" }}>{ch.name.split(" ")[0]}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <Btn onClick={save} full>Save Clue</Btn>
+        </Card>
+      ) : (
+        <Card style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <EmptyState icon="📜" title="Select a clue" body="Choose a clue from the list or add a new one." action={addClue} actionLabel="+ Add Clue" />
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SUSPECTS EDITOR
+// ══════════════════════════════════════════════════════════════════
+function SuspectsEditor({ suspects, characters, rounds, onChange }) {
+  function toggleElim(id) {
+    onChange(suspects.map(s => s.id===id ? {...s, eliminated:!s.eliminated, eliminatedRound:s.eliminated?null:s.eliminatedRound} : s));
+  }
+  function setRound(id, val) {
+    onChange(suspects.map(s => s.id===id ? {...s, eliminatedRound:val?Number(val):null} : s));
+  }
+
+  return (
+    <div>
+      <SectionHead title="Suspects & Eliminations" />
+      <div style={{ marginBottom:16, padding:"10px 14px", background:C.panelLt, border:`1px solid ${C.border}`, borderRadius:6, fontSize:11, color:C.muted, fontFamily:"monospace" }}>
+        Mark eliminations and assign rounds. This controls which players appear as active or crossed-out in the player app.
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:10 }}>
+        {suspects.map(s => {
+          const char = characters.find(c=>c.id===s.charId);
+          if (!char) return null;
+          return (
+            <Card key={s.id} style={{ padding:14, opacity:s.eliminated?0.7:1, borderColor:s.eliminated?C.red+"33":C.border }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:s.eliminated?12:0 }}>
+                <div style={{ width:36, height:36, borderRadius:"50%", background:`${ROLE_COLORS[char.role]||C.green}22`, border:`1.5px solid ${ROLE_COLORS[char.role]||C.green}44`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, color:C.cream, flexShrink:0 }}>{char.avatar}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, color:C.cream, fontWeight:"600" }}>{char.name}</div>
+                  <div style={{ fontSize:10, color:C.muted, fontFamily:"monospace" }}>{char.position}</div>
+                </div>
+                <div onClick={()=>toggleElim(s.id)} style={{
+                  width:32, height:18, borderRadius:9, background:s.eliminated?C.red:C.faint,
+                  position:"relative", cursor:"pointer", transition:"background 0.2s", flexShrink:0,
+                }}>
+                  <div style={{ position:"absolute", top:3, left:s.eliminated?17:3, width:12, height:12, borderRadius:"50%", background:C.white, transition:"left 0.2s" }} />
+                </div>
+              </div>
+              {s.eliminated && (
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10 }}>
+                  <Badge text="ELIMINATED" color={C.red} small />
+                  <select value={s.eliminatedRound||""} onChange={e=>setRound(s.id,e.target.value)} style={{ flex:1, background:C.bg, border:`1px solid ${C.red}44`, color:C.red, borderRadius:3, padding:"3px 6px", fontSize:10, fontFamily:"monospace" }}>
+                    <option value="">Round?</option>
+                    {rounds.map(r=><option key={r.id} value={r.round}>Round {r.round}</option>)}
+                  </select>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PLAYER ACCOUNTS
+// ══════════════════════════════════════════════════════════════════
+// ── QR Code generator (pure JS, no library needed) ──────────────
+// Encodes text into a QR-like SVG using a simple matrix approach.
+// For demo: generates a deterministic pixel grid from the string hash.
+// ── Real QR Code using qrcode library via canvas ─────────────────
+// Loads qrcode from CDN as a side-effect, generates actual scannable QR
+// ── Pure-JS QR Code generator (no external library) ──────────────
+// Implements full QR spec: Reed-Solomon ECC, byte mode encoding,
+// finder/timing/alignment/format patterns, zigzag placement, masking.
+function buildQRMatrix(text) {
+  // GF(256) lookup tables
+  const EXP=new Uint8Array(512), LOG=new Uint8Array(256);
+  let gx=1;
+  for(let i=0;i<255;i++){ EXP[i]=gx; LOG[gx]=i; gx<<=1; if(gx&256)gx^=285; }
+  for(let i=255;i<512;i++) EXP[i]=EXP[i-255];
+  const gmul=(a,b)=>a&&b?EXP[LOG[a]+LOG[b]]:0;
+
+  function genpoly(n){ let p=[1]; for(let i=0;i<n;i++){ const q=[1,EXP[i]]; const r=new Array(p.length+q.length-1).fill(0); for(let a=0;a<p.length;a++) for(let b=0;b<q.length;b++) r[a+b]^=gmul(p[a],q[b]); p=r; } return p; }
+  function rsencode(data,n){ const gen=genpoly(n); const d=new Uint8Array(data.length+n); d.set(data); for(let i=0;i<data.length;i++){ const c=d[i]; if(c) for(let j=0;j<gen.length;j++) d[i+j]^=gmul(gen[j],c); } return d.slice(data.length); }
+
+  // Byte-mode data
+  const bytes=[]; for(let i=0;i<text.length;i++) bytes.push(text.charCodeAt(i)&0xFF);
+  const len=bytes.length;
+
+  // Version config (ECC level M): N=matrix size, totalDC=data codewords,
+  // ecpb=ECC codewords/block, nb1/dc1=blocks of size dc1, nb2/dc2=blocks of size dc2
+  const VCFG=[null,
+    {N:21,totalDC:16,ecpb:10,nb1:1,dc1:16,nb2:0,dc2:0},
+    {N:25,totalDC:28,ecpb:16,nb1:1,dc1:28,nb2:0,dc2:0},
+    {N:29,totalDC:44,ecpb:26,nb1:1,dc1:44,nb2:0,dc2:0},
+    {N:33,totalDC:64,ecpb:18,nb1:2,dc1:32,nb2:0,dc2:0},
+    {N:37,totalDC:86,ecpb:24,nb1:2,dc1:43,nb2:0,dc2:0},
+    {N:41,totalDC:108,ecpb:16,nb1:2,dc1:27,nb2:2,dc2:28},
+    {N:45,totalDC:124,ecpb:18,nb1:4,dc1:31,nb2:0,dc2:0},
+  ];
+  // Max data bytes per version at ECC-M
+  const CAPS=[0,6,11,22,36,50,66,81];
+  let version=1; while(version<7 && CAPS[version]<len+3) version++;
+  if(version>7) throw new Error("Text too long");
+  const cfg=VCFG[version];
+
+  // Build bit stream
+  const bits=[];
+  const pn=(v,l)=>{ for(let i=l-1;i>=0;i--) bits.push((v>>i)&1); };
+  pn(0b0100,4); pn(len,8); bytes.forEach(b=>pn(b,8));
+  for(let i=0;i<4&&bits.length<cfg.totalDC*8;i++) bits.push(0);
+  while(bits.length%8) bits.push(0);
+  const dc=[]; for(let i=0;i<bits.length;i+=8){ let b=0; for(let j=0;j<8;j++) b=(b<<1)|(bits[i+j]||0); dc.push(b); }
+  const PAD=[236,17]; let pi=0; while(dc.length<cfg.totalDC) dc.push(PAD[pi++%2]);
+
+  // Build data/ECC blocks and interleave
+  const dataBlocks=[], eccBlocks=[]; let pos=0;
+  for(let i=0;i<cfg.nb1;i++){ dataBlocks.push(dc.slice(pos,pos+cfg.dc1)); pos+=cfg.dc1; }
+  for(let i=0;i<cfg.nb2;i++){ dataBlocks.push(dc.slice(pos,pos+cfg.dc2)); pos+=cfg.dc2; }
+  dataBlocks.forEach(b=>eccBlocks.push(rsencode(new Uint8Array(b),cfg.ecpb)));
+  const final=[]; const maxDC=Math.max(cfg.dc1,cfg.dc2||0);
+  for(let i=0;i<maxDC;i++) dataBlocks.forEach(b=>{ if(i<b.length) final.push(b[i]); });
+  for(let i=0;i<cfg.ecpb;i++) eccBlocks.forEach(b=>final.push(b[i]));
+  const finalBits=[]; final.forEach(b=>{ for(let i=7;i>=0;i--) finalBits.push((b>>i)&1); });
+  const REM=[0,0,7,7,7,7,7,0]; for(let i=0;i<(REM[version]||0);i++) finalBits.push(0);
+
+  // Build matrix (null=empty, -1=reserved format, 0=light, 1=dark)
+  const SZ=cfg.N;
+  const MAT=Array.from({length:SZ},()=>new Array(SZ).fill(null));
+  const setM=(r,c,v)=>{ if(r>=0&&r<SZ&&c>=0&&c<SZ&&MAT[r][c]===null) MAT[r][c]=v; };
+  const setF=(r,c,v)=>{ if(r>=0&&r<SZ&&c>=0&&c<SZ) MAT[r][c]=v; };
+
+  // Finder pattern + separator
+  function drawFinder(tr,tc){
+    for(let r=0;r<7;r++) for(let c=0;c<7;c++)
+      setF(tr+r,tc+c,(r===0||r===6||c===0||c===6||(r>=2&&r<=4&&c>=2&&c<=4))?1:0);
+    for(let k=-1;k<=7;k++){ setM(tr+7,tc+k,0); setM(tr-1,tc+k,0); setM(tr+k,tc+7,0); setM(tr+k,tc-1,0); }
+  }
+  drawFinder(0,0); drawFinder(0,SZ-7); drawFinder(SZ-7,0);
+
+  // Timing strips
+  for(let i=8;i<SZ-8;i++){ setM(6,i,i%2===0?1:0); setM(i,6,i%2===0?1:0); }
+
+  // Dark module
+  setM(SZ-8,8,1);
+
+  // Alignment patterns
+  const APOS={2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],7:[6,22,38]};
+  if(version>=2){
+    const pts=APOS[version];
+    for(let ai=0;ai<pts.length;ai++) for(let aj=0;aj<pts.length;aj++){
+      const r=pts[ai],c=pts[aj];
+      if(MAT[r][c]!==null) continue;
+      for(let dr=-2;dr<=2;dr++) for(let dc2=-2;dc2<=2;dc2++)
+        setF(r+dr,c+dc2,(Math.abs(dr)===2||Math.abs(dc2)===2||(dr===0&&dc2===0))?1:0);
+    }
+  }
+
+  // Reserve format info areas
+  for(let i=0;i<=8;i++){ if(MAT[8][i]===null) MAT[8][i]=-1; if(MAT[i][8]===null) MAT[i][8]=-1; }
+  for(let i=0;i<8;i++){ if(MAT[SZ-1-i][8]===null) MAT[SZ-1-i][8]=-1; if(MAT[8][SZ-1-i]===null) MAT[8][SZ-1-i]=-1; }
+
+  // Mask functions
+  const MASKS=[
+    (r,c)=>(r+c)%2===0,(r,c)=>r%2===0,(r,c)=>c%3===0,(r,c)=>(r+c)%3===0,
+    (r,c)=>(Math.floor(r/2)+Math.floor(c/3))%2===0,(r,c)=>(r*c)%2+(r*c)%3===0,
+    (r,c)=>((r*c)%2+(r*c)%3)%2===0,(r,c)=>((r+c)%2+(r*c)%3)%2===0,
+  ];
+
+  // Zigzag data placement (correct upward/downward direction per column pair)
+  function placeData(maskFn){
+    const tmp=MAT.map(r=>[...r]);
+    let bi=0, goUp=true, col=SZ-1;
+    while(col>=1){
+      if(col===6) col--;
+      for(let vi=0;vi<SZ;vi++){
+        const r=goUp?SZ-1-vi:vi;
+        for(let dx=0;dx<2;dx++){
+          const c=col-dx;
+          if(c<0||c>=SZ||tmp[r][c]!==null) continue;
+          const bit=bi<finalBits.length?finalBits[bi++]:0;
+          tmp[r][c]=bit^(maskFn(r,c)?1:0);
+        }
+      }
+      goUp=!goUp; col-=2;
+    }
+    return tmp;
+  }
+
+  // Penalty scoring
+  function penalty(mat){
+    let p=0;
+    for(let r=0;r<SZ;r++){ let run=1; for(let c=1;c<SZ;c++){ if(mat[r][c]===mat[r][c-1]&&mat[r][c]!==null){run++;if(run===5)p+=3;else if(run>5)p++;}else run=1; }}
+    for(let c=0;c<SZ;c++){ let run=1; for(let r=1;r<SZ;r++){ if(mat[r][c]===mat[r-1][c]&&mat[r][c]!==null){run++;if(run===5)p+=3;else if(run>5)p++;}else run=1; }}
+    for(let r=0;r<SZ-1;r++) for(let c=0;c<SZ-1;c++) if(mat[r][c]!==null&&mat[r][c]===mat[r+1][c]&&mat[r][c]===mat[r][c+1]&&mat[r][c]===mat[r+1][c+1]) p+=3;
+    return p;
+  }
+
+  let bestMat=null, bestPen=Infinity, bestMaskIdx=0;
+  for(let m=0;m<8;m++){ const mat=placeData(MASKS[m]); const pen=penalty(mat); if(pen<bestPen){bestPen=pen;bestMat=mat;bestMaskIdx=m;} }
+
+  // Format info (ECC level M = bits 01)
+  const fmtRaw=(0b01<<3)|bestMaskIdx;
+  let fmtRem=fmtRaw<<10;
+  const FMTPOLY=0b10100110111;
+  for(let i=14;i>=10;i--) if(fmtRem&(1<<i)) fmtRem^=FMTPOLY<<(i-10);
+  const fmtFull=((fmtRaw<<10)|(fmtRem&0x3FF))^0b101010000010010;
+  const fb=(i)=>(fmtFull>>i)&1;
+  const FC1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
+  FC1.forEach(([r,c],i)=>bestMat[r][c]=fb(14-i));
+  for(let i=0;i<7;i++) bestMat[SZ-1-i][8]=fb(i);
+  for(let i=7;i<15;i++) bestMat[8][SZ-15+i]=fb(i);
+  bestMat[SZ-8][8]=1;
+
+  return {matrix:bestMat, size:SZ};
+}
+
+function QRCode({ value, size=120, fgColor="#000000", bgColor="#FFFFFF" }) {
+  const result = useMemo(()=>{ try{ return buildQRMatrix(value); }catch(e){ return null; }}, [value]);
+  if (!result) return <div style={{width:size,height:size,background:bgColor,border:"1px solid #ccc",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:9,fontFamily:"monospace",color:"#999"}}>QR error</span></div>;
+  const {matrix,size:N} = result;
+  const cell=size/N;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+      <rect width={size} height={size} fill={bgColor}/>
+      {matrix.map((row,r)=>row.map((v,c)=>v===1?<rect key={`${r}-${c}`} x={c*cell} y={r*cell} width={cell+0.5} height={cell+0.5} fill={fgColor}/>:null))}
+    </svg>
+  );
+}
+
+// ── Download invite card as PNG ───────────────────────────────────
+function useCardDownload() {
+  return useCallback(async (cardEl, filename) => {
+    if (!cardEl) return;
+    // Dynamically load html2canvas if not present
+    if (!window.html2canvas) {
+      await new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const canvas = await window.html2canvas(cardEl, { backgroundColor:null, scale:2, useCORS:true, logging:false });
+    const link = document.createElement("a");
+    link.download = filename;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  }, []);
+}
+
+// ── Printable invite card ────────────────────────────────────────
+function InviteCard({ player, char, scenario, forPrint=false, cardRef=null }) {
+  const roleColor = ROLE_COLORS[char?.role]||C.green;
+  const joinUrl   = `https://{window.location.hostname}/join?code=${player.code}`;
+  const cardW     = forPrint ? 340 : 300;
+
+  return (
+    <div ref={cardRef} style={{
+      width: cardW,
+      background: forPrint?"#0D0703":"#0D0703",
+      border: `2px solid #C9A84C44`,
+      borderRadius: forPrint?0:8,
+      overflow:"hidden",
+      fontFamily:"'Playfair Display',serif",
+      boxShadow: forPrint?"none":"0 8px 32px rgba(0,0,0,0.6)",
+      pageBreakInside:"avoid",
+    }}>
+      {/* Gold header bar */}
+      <div style={{ background:"linear-gradient(135deg,#2A1505,#1A0F03)", borderBottom:"1px solid #C9A84C33", padding:"14px 18px 12px" }}>
+        <div style={{ fontSize:7, color:"#7A5F28", fontFamily:"monospace", letterSpacing:5, marginBottom:4 }}>EST. 1924 — THE GILDED BARREL</div>
+        <div style={{ fontSize:20, color:"#FFFFFF", fontWeight:"700", letterSpacing:2, lineHeight:1 }}>THE SYNDICATE</div>
+        <div style={{ fontSize:9, color:"#C9A84C", fontFamily:"monospace", letterSpacing:3, marginTop:4 }}>
+          {scenario?.story?.tagline || "A Night of Blood & Bourbon"}
+        </div>
+      </div>
+
+      {/* You are invited */}
+      <div style={{ padding:"12px 18px 8px", borderBottom:"1px solid #2A1A08" }}>
+        <div style={{ fontSize:8, color:"#7A5F28", fontFamily:"monospace", letterSpacing:3, marginBottom:4 }}>YOU ARE INVITED</div>
+        <div style={{ fontSize:18, color:"#F5E6C8", fontWeight:"700" }}>{player.name}</div>
+        <div style={{ fontSize:10, color:"#8A7050", fontFamily:"monospace", marginTop:2 }}>
+          {scenario?.story?.venue||"The Gilded Barrel Speakeasy"} · {scenario?.story?.date||"November 3rd, 1927"}
+        </div>
+      </div>
+
+      {/* Character assignment */}
+      {char && (
+        <div style={{ padding:"10px 18px 10px", borderBottom:"1px solid #2A1A08", background:`${roleColor}08` }}>
+          <div style={{ fontSize:8, color:"#7A5F28", fontFamily:"monospace", letterSpacing:3, marginBottom:6 }}>YOUR CHARACTER</div>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:40, height:40, borderRadius:"50%", background:`${roleColor}22`, border:`2px solid ${roleColor}66`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, color:"#F5E6C8", fontWeight:"bold", flexShrink:0 }}>
+              {char.avatar}
+            </div>
+            <div>
+              <div style={{ fontSize:14, color:"#F5E6C8", fontWeight:"700" }}>{char.name}</div>
+              <div style={{ fontSize:9, color:"#8A7050", fontFamily:"monospace" }}>{char.position}</div>
+            </div>
+            <div style={{ marginLeft:"auto", background:`${roleColor}18`, border:`1px solid ${roleColor}44`, borderRadius:2, padding:"2px 8px", fontSize:8, color:roleColor, fontFamily:"monospace", letterSpacing:1 }}>
+              {char.role}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR + code — white bg / black modules for print legibility */}
+      <div style={{ padding:"12px 18px 14px", display:"flex", alignItems:"center", gap:14, background:"#FFFFFF" }}>
+        <div style={{ background:"#FFFFFF", border:"1px solid #CCCCCC", borderRadius:4, padding:5, flexShrink:0 }}>
+          <QRCode value={joinUrl} size={88} fgColor="#000000" bgColor="#FFFFFF" />
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:8, color:"#333333", fontFamily:"monospace", letterSpacing:3, marginBottom:5, fontWeight:"bold" }}>SCAN TO JOIN</div>
+          <div style={{ fontSize:7, color:"#666666", fontFamily:"monospace", marginBottom:8, wordBreak:"break-all", lineHeight:1.5 }}>
+            {joinUrl}
+          </div>
+          <div style={{ background:"#F5F0E8", border:"1px solid #C9A84C", borderRadius:3, padding:"6px 10px" }}>
+            <div style={{ fontSize:7, color:"#7A5F28", fontFamily:"monospace", letterSpacing:2, marginBottom:2 }}>GAME CODE</div>
+            <div style={{ fontSize:16, color:"#1A0A00", fontFamily:"monospace", fontWeight:"bold", letterSpacing:3 }}>{player.code}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding:"8px 18px", background:"#07040A", borderTop:"1px solid #1A1008", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div style={{ fontSize:8, color:"#3A2A10", fontFamily:"monospace" }}>KEEP THIS CARD PRIVATE</div>
+        <div style={{ fontSize:8, color:"#3A2A10", fontFamily:"monospace" }}>{window.location.hostname}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Print all cards ──────────────────────────────────────────────
+function PrintAllModal({ players, characters, scenario, onClose }) {
+  function doPrint() { window.print(); }
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:9000, display:"flex", flexDirection:"column", overflow:"auto" }}>
+      <div style={{ background:C.panel, borderBottom:`1px solid ${C.border}`, padding:"14px 24px", display:"flex", alignItems:"center", gap:16, flexShrink:0 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:14, color:C.cream, fontWeight:"700" }}>Print Invite Cards</div>
+          <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{players.length} card{players.length!==1?"s":""} · Print or save as PDF from your browser dialog</div>
+        </div>
+        <Btn onClick={doPrint}>🖨 Print / Save PDF</Btn>
+        <Btn onClick={onClose} variant="ghost">Close</Btn>
+      </div>
+      <div id="print-area" style={{ padding:32, display:"flex", flexWrap:"wrap", gap:24, justifyContent:"center" }}>
+        {players.map(p=>{
+          const char=characters.find(c=>c.id===p.character);
+          return <InviteCard key={p.id} player={p} char={char} scenario={scenario} forPrint />;
+        })}
+      </div>
+      <style>{`
+        @media print {
+          body > *:not(#root) { display:none!important; }
+          #print-area { display:flex!important; flex-wrap:wrap; gap:16px; padding:8px; }
+          #print-area > * { page-break-inside:avoid; }
+          .no-print { display:none!important; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function PlayerAccounts({ players, characters, scenario, onChange }) {
+  const [newName, setNewName]       = useState("");
+  const [newChar, setNewChar]       = useState("");
+  const [viewCard, setViewCard]     = useState(null); // player id
+  const [showPrint, setShowPrint]   = useState(false);
+  const [view, setView]             = useState("list"); // list | cards
+  const [downloading, setDownloading] = useState(null);
+  const previewCardRef = useRef(null);
+  const downloadCard   = useCardDownload();
+
+  async function handleDownload(player, char) {
+    if (!previewCardRef.current) return;
+    setDownloading(player.id);
+    try {
+      await downloadCard(previewCardRef.current, `syndicate-invite-${player.name.replace(/\s+/g,"-").toLowerCase()}.png`);
+    } catch(e) {}
+    setDownloading(null);
+  }
+
+  function addPlayer() {
+    if (!newName || !newChar) return;
+    const p = { id:uid(), name:newName, code:generateCode(), character:newChar, joined:false, lastSeen:"Never" };
+    onChange([...players, p]);
+    setNewName(""); setNewChar("");
+  }
+  function removePlayer(id) {
+    onChange(players.filter(p=>p.id!==id));
+    if (viewCard===id) setViewCard(null);
+  }
+  function generateCode() {
+    const words = ["MALT","RYES","CORN","MASH","STILL","CASK","WORT","MEAD","HOPS","BURL"];
+    return `${words[Math.floor(Math.random()*words.length)]}-${Math.floor(1000+Math.random()*9000)}`;
+  }
+  function regenerateCode(id) {
+    onChange(players.map(p=>p.id===id?{...p,code:generateCode()}:p));
+  }
+
+  const selectedPlayer = players.find(p=>p.id===viewCard);
+  const selectedChar   = characters.find(c=>c.id===selectedPlayer?.character);
+
+  return (
+    <div>
+      {showPrint && (
+        <PrintAllModal players={players} characters={characters} scenario={scenario} onClose={()=>setShowPrint(false)} />
+      )}
+
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+        <div style={{ fontSize:16, color:C.cream, fontFamily:"'Playfair Display',serif", fontWeight:"700" }}>Players & Invite Cards</div>
+        <div style={{ display:"flex", gap:8 }}>
+          {/* View toggle */}
+          <div style={{ display:"flex", background:C.panel, border:`1px solid ${C.border}`, borderRadius:4, overflow:"hidden" }}>
+            {["list","cards"].map(v=>(
+              <button key={v} onClick={()=>setView(v)} style={{ padding:"6px 14px", background:view===v?`${C.gold}22`:"transparent", border:"none", color:view===v?C.gold:C.muted, fontSize:10, fontFamily:"monospace", letterSpacing:1, cursor:"pointer", textTransform:"uppercase" }}>{v}</button>
+            ))}
+          </div>
+          {players.length>0 && <Btn onClick={()=>setShowPrint(true)} variant="ghost" size="sm">🖨 Print All Cards</Btn>}
+        </div>
+      </div>
+
+      {/* Add player form */}
+      <Card style={{ padding:18, marginBottom:20 }}>
+        <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:14 }}>ADD PLAYER</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:12, alignItems:"end" }}>
+          <Input label="Player Name" value={newName} onChange={setNewName} placeholder="Sarah Chen" />
+          <div>
+            <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>ASSIGN CHARACTER</div>
+            <select value={newChar} onChange={e=>setNewChar(e.target.value)} style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, color:C.text, borderRadius:4, padding:"9px 12px", fontSize:12, fontFamily:"monospace", outline:"none" }}>
+              <option value="">Select...</option>
+              {characters.map(c=><option key={c.id} value={c.id}>{c.name} ({c.role})</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <Btn onClick={addPlayer} disabled={!newName||!newChar}>Add Player</Btn>
+          </div>
+        </div>
+      </Card>
+
+      {players.length===0 && (
+        <EmptyState icon="👥" title="No players yet" body="Add players above and assign each one a character. Each player gets a unique QR code and game code for their invite card." />
+      )}
+
+      {/* ── CARD VIEW ─────────────────────────────────────────── */}
+      {view==="cards" && players.length>0 && (
+        <div style={{ display:"flex", flexWrap:"wrap", gap:20 }}>
+          {players.map(p=>{
+            const char=characters.find(c=>c.id===p.character);
+            const cardElRef = { current: null };
+            return (
+              <div key={p.id}>
+                <InviteCard player={p} char={char} scenario={scenario} cardRef={el=>{ cardElRef.current=el; }} />
+                <div style={{ display:"flex", gap:6, marginTop:8, justifyContent:"center" }}>
+                  <Btn onClick={()=>{ downloading===p.id?null:( setDownloading(p.id), downloadCard(cardElRef.current, `syndicate-invite-${p.name.replace(/\s+/g,"-").toLowerCase()}.png`).finally(()=>setDownloading(null)) ); }} size="sm" disabled={downloading===p.id}>
+                    {downloading===p.id?"Saving...":"⬇ PNG"}
+                  </Btn>
+                  <Btn onClick={()=>regenerateCode(p.id)} size="sm" variant="ghost">↻ Code</Btn>
+                  <Btn onClick={()=>removePlayer(p.id)} size="sm" variant="danger">✕</Btn>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── LIST VIEW ─────────────────────────────────────────── */}
+      {view==="list" && players.length>0 && (
+        <div style={{ display:"grid", gridTemplateColumns: viewCard?"1fr 320px":"1fr", gap:16 }}>
+          {/* Player list */}
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {players.map(p => {
+              const char = characters.find(c=>c.id===p.character);
+              const isSelected = viewCard===p.id;
+              return (
+                <Card key={p.id} style={{ padding:"12px 16px", border:`1px solid ${isSelected?C.gold+"44":C.border}`, cursor:"pointer", transition:"border-color 0.15s" }}
+                  onClick={()=>setViewCard(isSelected?null:p.id)}>
+                  <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+                    {/* QR thumbnail */}
+                    <div style={{ width:44, height:44, background:"#07040A", border:`1px solid ${C.border}`, borderRadius:4, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, overflow:"hidden" }}>
+                      <QRCode value={`${window.location.origin}${window.location.pathname.replace(/\/index\.html$/,"").replace(/\/?$/,"")}/join/?code=${p.code}`} size={40} fgColor={C.gold} bgColor="#07040A" />
+                    </div>
+                    {/* Avatar */}
+                    <div style={{ width:36, height:36, borderRadius:"50%", background:`${char?ROLE_COLORS[char.role]:C.gold}22`, border:`1.5px solid ${char?ROLE_COLORS[char.role]:C.gold}44`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:C.cream, fontWeight:"bold", flexShrink:0 }}>
+                      {char?.avatar||"?"}
+                    </div>
+                    {/* Name + char */}
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, color:C.cream, fontWeight:"600", marginBottom:2 }}>{p.name}</div>
+                      <div style={{ fontSize:10, color:C.muted, fontFamily:"monospace" }}>
+                        {char?.name||"Unassigned"}
+                        {char && <span style={{ marginLeft:6 }}><Badge text={char.role} color={ROLE_COLORS[char.role]||C.green} small /></span>}
+                      </div>
+                    </div>
+                    {/* Code */}
+                    <div style={{ textAlign:"center", padding:"5px 10px", background:C.panelLt, border:`1px solid ${C.border}`, borderRadius:4 }}>
+                      <div style={{ fontSize:7, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:1 }}>CODE</div>
+                      <div style={{ fontSize:13, color:C.gold, fontFamily:"monospace", fontWeight:"bold", letterSpacing:2 }}>{p.code}</div>
+                    </div>
+                    {/* Status dot */}
+                    <div style={{ textAlign:"center", minWidth:52 }}>
+                      <div style={{ width:8, height:8, borderRadius:"50%", background:p.joined?C.green:C.faint, margin:"0 auto 3px", boxShadow:p.joined?`0 0 6px ${C.green}`:undefined }} />
+                      <div style={{ fontSize:8, color:p.joined?C.green:C.muted, fontFamily:"monospace" }}>{p.joined?"ONLINE":"OFFLINE"}</div>
+                    </div>
+                    {/* Actions */}
+                    <div style={{ display:"flex", gap:6 }} onClick={e=>e.stopPropagation()}>
+                      <Btn onClick={()=>regenerateCode(p.id)} size="sm" variant="ghost" title="Generate new code">↻</Btn>
+                      <Btn onClick={()=>removePlayer(p.id)} size="sm" variant="ghost">✕</Btn>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Invite card preview panel */}
+          {viewCard && selectedPlayer && (
+            <div style={{ position:"sticky", top:0, alignSelf:"start" }}>
+              <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:10, textAlign:"center" }}>INVITE CARD PREVIEW</div>
+              <div style={{ display:"flex", justifyContent:"center" }}>
+                <InviteCard player={selectedPlayer} char={selectedChar} scenario={scenario} cardRef={previewCardRef} />
+              </div>
+              <div style={{ display:"flex", gap:6, marginTop:10, justifyContent:"center" }}>
+                <Btn onClick={()=>handleDownload(selectedPlayer, selectedChar)} size="sm" disabled={downloading===selectedPlayer.id}>
+                  {downloading===selectedPlayer.id ? "Saving..." : "⬇ Save PNG"}
+                </Btn>
+                <Btn onClick={()=>setShowPrint(true)} size="sm" variant="ghost">🖨 Print All</Btn>
+                <Btn onClick={()=>regenerateCode(selectedPlayer.id)} size="sm" variant="ghost">↻ New Code</Btn>
+              </div>
+              <div style={{ marginTop:10, padding:"8px 12px", background:C.panelLt, border:`1px solid ${C.border}`, borderRadius:4, fontSize:10, color:C.muted, fontFamily:"monospace", lineHeight:1.6, textAlign:"center" }}>
+                QR scans to:<br/>
+                <span style={{ color:C.gold, wordBreak:"break-all", fontSize:9 }}>
+                  {window.location.hostname}/join?code={selectedPlayer.code}
+                </span>
+              </div>
+              <div style={{ marginTop:8, padding:"6px 12px", background:C.greenDim, border:`1px solid ${C.green}33`, borderRadius:4, fontSize:9, color:C.green, fontFamily:"monospace", textAlign:"center", lineHeight:1.6 }}>
+                ✓ QR code is real and scannable<br/>
+                <span style={{ color:C.muted }}>Save as PNG to include in invite PDFs</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// LIVE GAME CONTROLS
+// ══════════════════════════════════════════════════════════════════
+function LiveControls({ scenario, onToast }) {
+  const [round, setRound]           = useState(3);
+  const [phase, setPhase]           = useState("interrogation");
+  const [timer, setTimer]           = useState(420);
+  const [timerOn, setTimerOn]       = useState(false);
+  const [votedCount, setVotedCount] = useState(4);
+  const [sentClues, setSentClues]   = useState(new Set());
+
+  useEffect(() => {
+    if (!timerOn || timer<=0) return;
+    const t = setInterval(()=>setTimer(x=>x-1),1000);
+    return ()=>clearInterval(t);
+  },[timerOn,timer]);
+
+  const fmt = s=>`${Math.floor(s/60).toString().padStart(2,"0")}:${(s%60).toString().padStart(2,"0")}`;
+  const activeCount = scenario.suspects.filter(s=>!s.eliminated).length;
+  const roundClues = scenario.clues.filter(c=>c.round===round);
+  const timerCol = timer<60?C.red:timer<120?C.amber:C.cream;
+
+  function sendClue(id) {
+    setSentClues(s=>new Set([...s,id]));
+    const c = scenario.clues.find(x=>x.id===id);
+    onToast(`Sent: "${c?.title}"`, "success");
+  }
+
+  return (
+    <div>
+      <SectionHead title="Live Game Controls" />
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14, marginBottom:14 }}>
+
+        {/* Timer */}
+        <Card style={{ padding:18, textAlign:"center" }}>
+          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>ROUND TIMER</div>
+          <div style={{ fontSize:48, fontFamily:"monospace", fontWeight:"bold", color:timerCol, lineHeight:1, marginBottom:4, textShadow:timer<60?`0 0 20px ${C.red}`:undefined }}>{fmt(timer)}</div>
+          <div style={{ height:4, background:C.faint, borderRadius:2, marginBottom:14, overflow:"hidden" }}>
+            <div style={{ height:"100%", background:`linear-gradient(90deg,${C.gold},#A87830)`, width:`${(timer/600)*100}%`, borderRadius:2, transition:"width 1s linear" }} />
+          </div>
+          <div style={{ display:"flex", gap:6, justifyContent:"center" }}>
+            <Btn onClick={()=>setTimerOn(x=>!x)} size="sm" variant={timerOn?"danger":"primary"}>{timerOn?"PAUSE":"START"}</Btn>
+            <Btn onClick={()=>{setTimer(600);setTimerOn(false);}} size="sm" variant="ghost">RESET</Btn>
+          </div>
+        </Card>
+
+        {/* Round control */}
+        <Card style={{ padding:18 }}>
+          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>ROUND CONTROL</div>
+          <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:14 }}>
+            <Btn onClick={()=>setRound(r=>Math.max(1,r-1))} size="sm" variant="ghost">‹</Btn>
+            <div style={{ flex:1, textAlign:"center" }}>
+              <div style={{ fontSize:32, fontFamily:"monospace", fontWeight:"bold", color:C.cream, lineHeight:1 }}>{round}</div>
+              <div style={{ fontSize:10, color:C.gold, fontFamily:"monospace" }}>OF 5</div>
+            </div>
+            <Btn onClick={()=>setRound(r=>Math.min(5,r+1))} size="sm" variant="ghost">›</Btn>
+          </div>
+          <div style={{ fontSize:12, color:C.cream, fontWeight:"600", marginBottom:4 }}>{scenario.rounds[round-1]?.title||"—"}</div>
+          <div style={{ fontSize:10, color:C.muted, fontFamily:"monospace" }}>{scenario.rounds[round-1]?.timing}</div>
+        </Card>
+
+        {/* Voting */}
+        <Card style={{ padding:18 }}>
+          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>VOTING</div>
+          <div style={{ textAlign:"center", marginBottom:10 }}>
+            <div style={{ fontSize:36, fontFamily:"monospace", fontWeight:"bold", color:C.cream, lineHeight:1 }}>{votedCount}<span style={{ fontSize:18, color:C.muted }}>/{activeCount}</span></div>
+            <div style={{ fontSize:9, color:C.gold, fontFamily:"monospace", letterSpacing:1, marginTop:2 }}>VOTES CAST</div>
+          </div>
+          <div style={{ height:4, background:C.faint, borderRadius:2, marginBottom:12, overflow:"hidden" }}>
+            <div style={{ height:"100%", background:`linear-gradient(90deg,${C.red},#C03030)`, width:`${(votedCount/activeCount)*100}%`, borderRadius:2 }} />
+          </div>
+          <div style={{ display:"flex", gap:6 }}>
+            <Btn onClick={()=>setVotedCount(v=>Math.min(activeCount,v+1))} size="sm" variant="ghost" full>+1 Vote</Btn>
+            <Btn onClick={()=>{setPhase("voting");onToast("Voting opened on all devices","success");}} size="sm" full>Open</Btn>
+          </div>
+        </Card>
+      </div>
+
+      {/* Clue dispatch for this round */}
+      <Card style={{ padding:18, marginBottom:14 }}>
+        <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:14 }}>CLUE DISPATCH — ROUND {round}</div>
+        {roundClues.length===0
+          ? <div style={{ fontSize:12, color:C.muted, fontStyle:"italic" }}>No clues configured for this round.</div>
+          : (
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {roundClues.map(c => {
+                const tc = TYPE_COLORS[c.type]||C.gold;
+                const sent = sentClues.has(c.id);
+                return (
+                  <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:sent?`${tc}0A`:C.panelLt, border:`1px solid ${sent?tc+"33":C.border}`, borderRadius:6 }}>
+                    <div style={{ width:3, alignSelf:"stretch", background:sent?tc:C.faint, borderRadius:2, flexShrink:0 }} />
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:2 }}>
+                        <Badge text={c.type} color={tc} small />
+                        {c.private && <Badge text="private" color={C.purp} small />}
+                        <span style={{ fontSize:9, color:C.muted, fontFamily:"monospace" }}>{c.time}</span>
+                      </div>
+                      <div style={{ fontSize:12, color:sent?C.muted:C.cream, fontWeight:"600" }}>{c.title}</div>
+                    </div>
+                    <Btn onClick={()=>sendClue(c.id)} size="sm" disabled={sent} variant={sent?"ghost":"primary"}>
+                      {sent?"SENT":"SEND"}
+                    </Btn>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+      </Card>
+
+      {/* Quick actions */}
+      <Card style={{ padding:18 }}>
+        <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>QUICK ACTIONS</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8 }}>
+          {[
+            { label:"Pause All",    action:()=>{setTimerOn(false);onToast("All timers paused","success");} },
+            { label:"Full Reveal",  action:()=>onToast("Full reveal triggered on main screen","success") },
+            { label:"Send Tip",     action:()=>onToast("Anonymous tip sent to all players","success") },
+            { label:"End Session",  action:()=>onToast("Session ended — report exported","success") },
+          ].map((a,i)=>(
+            <Btn key={i} onClick={a.action} size="sm" variant="ghost" full>{a.label}</Btn>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PREVIEW MODE (player's clue feed with current data)
+// ══════════════════════════════════════════════════════════════════
+function PreviewMode({ scenario }) {
+  const [previewChar, setPreviewChar] = useState(scenario.characters[0]?.id||null);
+  const [previewRound, setPreviewRound] = useState(1);
+  const [filter, setFilter]         = useState("all");
+  const [expanded, setExpanded]     = useState(null);
+
+  const char = scenario.characters.find(c=>c.id===previewChar);
+  const TC = { dispatch:C.gold, evidence:C.red, private:C.purp, tip:"#608060", final:C.amber };
+
+  const visibleClues = scenario.clues.filter(c => {
+    if (c.round > previewRound) return false;
+    if (c.private) return c.chars.includes(previewChar);
+    return true;
+  }).filter(c => filter==="all" || (filter==="private"&&c.private) || (filter==="public"&&!c.private));
+
+  const byRound = visibleClues.reduce((acc,c) => { acc[c.round]=[...(acc[c.round]||[]),c]; return acc; }, {});
+
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 360px", gap:20, alignItems:"start" }}>
+      {/* Controls */}
+      <div>
+        <SectionHead title="Player Preview" />
+        <Card style={{ padding:18, marginBottom:14 }}>
+          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>PREVIEW SETTINGS</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            <div>
+              <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>VIEW AS CHARACTER</div>
+              <select value={previewChar||""} onChange={e=>setPreviewChar(e.target.value)} style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, color:C.text, borderRadius:4, padding:"9px 12px", fontSize:12, fontFamily:"monospace", outline:"none" }}>
+                {scenario.characters.map(c=><option key={c.id} value={c.id}>{c.name} ({c.role})</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>ROUND</div>
+              <select value={previewRound} onChange={e=>setPreviewRound(Number(e.target.value))} style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, color:C.text, borderRadius:4, padding:"9px 12px", fontSize:12, fontFamily:"monospace", outline:"none" }}>
+                {scenario.rounds.map(r=><option key={r.id} value={r.round}>Round {r.round} — {r.title}</option>)}
+              </select>
+            </div>
+          </div>
+        </Card>
+
+        {/* Character summary */}
+        {char && (
+          <Card style={{ padding:18 }}>
+            <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:14 }}>CHARACTER SNAPSHOT</div>
+            <div style={{ display:"flex", gap:14, marginBottom:14 }}>
+              <div style={{ width:48, height:48, borderRadius:"50%", background:`${ROLE_COLORS[char.role]||C.green}22`, border:`2px solid ${ROLE_COLORS[char.role]||C.green}66`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, color:C.cream, fontWeight:"bold", flexShrink:0 }}>{char.avatar}</div>
+              <div>
+                <div style={{ fontSize:15, color:C.cream, fontWeight:"700", marginBottom:2 }}>{char.name}</div>
+                <div style={{ display:"flex", gap:6 }}>
+                  <Badge text={char.role} color={ROLE_COLORS[char.role]||C.green} />
+                  <span style={{ fontSize:10, color:C.muted, fontFamily:"monospace", paddingTop:2 }}>{char.position}</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize:11, color:C.muted, marginBottom:4 }}><span style={{ color:C.gold }}>Alibi:</span> {char.alibi}</div>
+            <div style={{ fontSize:11, color:C.muted, marginBottom:4 }}><span style={{ color:C.gold }}>Objective:</span> {char.objective}</div>
+            <div style={{ fontSize:11, color:C.purp }}><span style={{ color:C.purpLt }}>Secret:</span> {char.secret}</div>
+          </Card>
+        )}
+      </div>
+
+      {/* Phone preview */}
+      <div>
+        <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, textAlign:"center", marginBottom:12 }}>LIVE PREVIEW</div>
+        <div style={{
+          width:340, background:"#0D0703", borderRadius:32, border:"2px solid #3A2A10",
+          boxShadow:"0 24px 60px rgba(0,0,0,0.7)", overflow:"hidden", fontFamily:"'Playfair Display',serif",
+          margin:"0 auto",
+        }}>
+          {/* Notch */}
+          <div style={{ height:28, background:"#070401", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <div style={{ width:80, height:14, background:"#070401", borderRadius:8, border:"1px solid #2A1A08" }} />
+          </div>
+          {/* Status bar */}
+          <div style={{ padding:"8px 16px 6px", display:"flex", justifyContent:"space-between", borderBottom:"1px solid #2A1A08" }}>
+            <div style={{ fontSize:9, color:C.gold, fontFamily:"monospace" }}>R{previewRound}</div>
+            <div style={{ fontSize:9, color:C.cream, fontFamily:"monospace", fontWeight:"bold", letterSpacing:2 }}>THE SYNDICATE</div>
+            <div style={{ display:"flex", gap:2 }}>{[1,2,3].map(i=><div key={i} style={{ width:4,height:4,borderRadius:"50%",background:C.gold }} />)}</div>
+          </div>
+          {/* Feed header */}
+          <div style={{ padding:"10px 14px 8px", borderBottom:"1px solid #2A1A08" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+              <div style={{ fontSize:13, color:C.cream, fontWeight:"700", fontFamily:"'Playfair Display',serif" }}>Clue Feed</div>
+              <div style={{ fontSize:9, color:"#7A5F28", fontFamily:"monospace" }}>{visibleClues.length} clue{visibleClues.length!==1?"s":""}</div>
+            </div>
+            <div style={{ display:"flex", gap:5 }}>
+              {["all","public","private"].map(f=>(
+                <button key={f} onClick={()=>setFilter(f)} style={{ flex:1, background:filter===f?"rgba(201,168,76,0.15)":"none", border:`1px solid ${filter===f?"rgba(201,168,76,0.4)":"#2A1A08"}`, color:filter===f?C.gold:"#5A4A30", fontSize:8, fontFamily:"monospace", padding:"4px 0", borderRadius:3, cursor:"pointer", textTransform:"uppercase" }}>{f}</button>
+              ))}
+            </div>
+          </div>
+          {/* Feed */}
+          <div style={{ maxHeight:460, overflowY:"auto", padding:"10px 12px 16px" }}>
+            {visibleClues.length===0 ? (
+              <div style={{ textAlign:"center", padding:"32px 16px", color:"#3A2A10", fontStyle:"italic", fontSize:12 }}>No clues visible at this point.</div>
+            ) : (
+              Object.entries(byRound).sort((a,b)=>b[0]-a[0]).map(([r,clues])=>(
+                <div key={r}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, margin:"12px 0 8px" }}>
+                    <div style={{ flex:1, height:1, background:"linear-gradient(to right,transparent,rgba(201,168,76,0.2))" }} />
+                    <div style={{ fontSize:8, color:"#5A4A30", fontFamily:"monospace", letterSpacing:1 }}>ROUND {r}</div>
+                    <div style={{ flex:1, height:1, background:"linear-gradient(to left,transparent,rgba(201,168,76,0.2))" }} />
+                  </div>
+                  {[...clues].reverse().map(c=>{
+                    const tc=TC[c.type]||C.gold;
+                    const isExp = expanded===c.id;
+                    return (
+                      <div key={c.id} onClick={()=>setExpanded(isExp?null:c.id)} style={{
+                        background:c.private?"#0E0414":"#120A02",
+                        border:`1px solid ${tc}${isExp?"55":"22"}`,
+                        borderLeft:`3px solid ${tc}`,
+                        borderRadius:"0 6px 6px 0", padding:"9px 12px", marginBottom:7,
+                        cursor:"pointer",
+                      }}>
+                        <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:4 }}>
+                          <span style={{ fontSize:8, color:tc, fontFamily:"monospace", letterSpacing:1 }}>{c.type.toUpperCase()}</span>
+                          {c.private && <span style={{ fontSize:7, color:"#7A50A0", fontFamily:"monospace", background:"rgba(58,26,92,0.3)", border:"1px solid rgba(58,26,92,0.5)", padding:"1px 5px", borderRadius:2 }}>ONLY YOU</span>}
+                          <span style={{ fontSize:8, color:"#5A4A30", fontFamily:"monospace", marginLeft:"auto" }}>{c.time}</span>
+                        </div>
+                        <div style={{ fontSize:12, color:C.cream, fontWeight:"600", marginBottom:3, fontFamily:"'Playfair Display',serif" }}>{c.title}</div>
+                        <div style={{ fontSize:11, color:c.private?"#C0A0E0":"#8A7050", lineHeight:1.5, display:isExp?"block":"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:isExp?"visible":"hidden", fontStyle:c.private?"italic":"normal" }}>
+                          {c.text}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// STORY EDITOR
+// ══════════════════════════════════════════════════════════════════
+function StoryEditor({ scenario, onChange }) {
+  const blank = { tagline:"", venue:"", date:"", premise:"", victim:"", victimBackground:"", masterTruth:"", hostOpeningScript:"", winCondition:"" };
+  const [draft, setDraft] = useState({ ...blank, ...(scenario.story||{}) });
+  const [saved, setSaved] = useState(false);
+
+  function set(k,v) { setDraft(d=>({...d,[k]:v})); setSaved(false); }
+  function save() { onChange({ story: draft }); setSaved(true); }
+
+  const fields = [
+    { key:"tagline",           label:"Tagline",                  hint:"Short evocative subtitle shown on the big screen and player app",    multiline:false },
+    { key:"venue",             label:"Venue / Location",         hint:"Where the story takes place",                                         multiline:false },
+    { key:"date",              label:"In-Game Date",             hint:"The date the story is set",                                           multiline:false },
+    { key:"victim",            label:"Victim Name",              hint:"The name of the person who was killed",                               multiline:false },
+    { key:"victimBackground",  label:"Victim Background",        hint:"Context for who the victim was and why they mattered",               multiline:true, rows:3 },
+    { key:"premise",           label:"Story Premise",            hint:"Opening situation shown to players on the instruction screen",        multiline:true, rows:4 },
+    { key:"hostOpeningScript", label:"Host Opening Script",      hint:"Word-for-word script the host reads to open the game",               multiline:true, rows:4 },
+    { key:"winCondition",      label:"Win Condition",            hint:"How each side wins — displayed on the instructions screen",           multiline:false },
+  ];
+
+  return (
+    <div>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24 }}>
+        <div>
+          <div style={{ fontSize:16, color:C.cream, fontFamily:"'Playfair Display',serif", fontWeight:"700", marginBottom:4 }}>Story & Game Details</div>
+          <div style={{ fontSize:11, color:C.muted }}>Edit the core narrative, victim, master truth, and host scripts for this scenario.</div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          {saved && <div style={{ fontSize:10, color:C.green, fontFamily:"monospace", letterSpacing:1 }}>✓ SAVED</div>}
+          <Btn onClick={save}>Save All Changes</Btn>
+        </div>
+      </div>
+
+      <Card style={{ padding:20, marginBottom:20 }}>
+        <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:14 }}>SCENARIO IDENTITY</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+          <div>
+            <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>SCENARIO NAME</div>
+            <input value={scenario.name} onChange={e=>onChange({name:e.target.value})}
+              style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, borderRadius:4, padding:"9px 12px", color:C.text, fontSize:12, fontFamily:"monospace", outline:"none", boxSizing:"border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>SETTING</div>
+            <input value={scenario.setting} onChange={e=>onChange({setting:e.target.value})}
+              style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, borderRadius:4, padding:"9px 12px", color:C.text, fontSize:12, fontFamily:"monospace", outline:"none", boxSizing:"border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>STATUS</div>
+            <select value={scenario.status} onChange={e=>onChange({status:e.target.value})}
+              style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, borderRadius:4, padding:"9px 12px", color:C.text, fontSize:12, fontFamily:"monospace", outline:"none" }}>
+              <option value="draft">Draft</option>
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+        </div>
+      </Card>
+
+      <Card style={{ padding:20, marginBottom:20, border:`1px solid ${C.red}33`, background:"rgba(192,57,43,0.08)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+          <div style={{ width:8, height:8, borderRadius:"50%", background:C.red }} />
+          <div style={{ fontSize:9, color:C.red, fontFamily:"monospace", letterSpacing:2 }}>MASTER TRUTH — HOST EYES ONLY</div>
+        </div>
+        <div style={{ fontSize:11, color:C.muted, marginBottom:12 }}>The full solution — killer, method, motive, accomplices. Never shown to players.</div>
+        <textarea value={draft.masterTruth} onChange={e=>set("masterTruth",e.target.value)} rows={5}
+          style={{ width:"100%", background:C.bg, border:`1px solid ${C.red}33`, borderRadius:4, padding:"9px 12px", color:C.text, fontSize:12, fontFamily:"monospace", outline:"none", resize:"vertical", boxSizing:"border-box" }} />
+      </Card>
+
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+        {fields.map(f => (
+          <Card key={f.key} style={{ padding:18, gridColumn: f.multiline && (f.rows||0)>=4 ? "1 / -1" : undefined }}>
+            <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>{f.label.toUpperCase()}</div>
+            <div style={{ fontSize:10, color:C.muted, marginBottom:10 }}>{f.hint}</div>
+            {f.multiline
+              ? <textarea value={draft[f.key]||""} onChange={e=>set(f.key,e.target.value)} rows={f.rows||3}
+                  style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, borderRadius:4, padding:"9px 12px", color:C.text, fontSize:12, fontFamily:"monospace", outline:"none", resize:"vertical", boxSizing:"border-box" }} />
+              : <input value={draft[f.key]||""} onChange={e=>set(f.key,e.target.value)}
+                  style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, borderRadius:4, padding:"9px 12px", color:C.text, fontSize:12, fontFamily:"monospace", outline:"none", boxSizing:"border-box" }} />
+            }
+          </Card>
+        ))}
+      </div>
+
+      <div style={{ marginTop:20, display:"flex", justifyContent:"flex-end", gap:10 }}>
+        {saved && <div style={{ fontSize:10, color:C.green, fontFamily:"monospace", letterSpacing:1, alignSelf:"center" }}>✓ ALL CHANGES SAVED</div>}
+        <Btn onClick={save} size="lg">Save All Changes</Btn>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MAIN ADMIN APP
+// ══════════════════════════════════════════════════════════════════
+const NAV = [
+  { id:"scenarios", icon:"◈", label:"Scenarios" },
+  { id:"story",     icon:"📖", label:"Story" },
+  { id:"rounds",    icon:"⏱", label:"Rounds" },
+  { id:"characters",icon:"🎭", label:"Characters" },
+  { id:"clues",     icon:"📜", label:"Clues" },
+  { id:"suspects",  icon:"👁", label:"Suspects" },
+  { id:"players",   icon:"👥", label:"Players" },
+  { id:"live",      icon:"⚡", label:"Live" },
+  { id:"preview",   icon:"◆", label:"Preview" },
+];
+
+function AdminPortal() {
+  const [loggedIn, setLoggedIn]     = useState(false);
+  const [scenarios, setScenarios]   = useState(SEED_SCENARIOS);
+  const [activeScenId, setActiveScenId] = useState("s1");
+  const [activeNav, setActiveNav]   = useState("scenarios");
+  const [toast, setToast]           = useState(null);
+  const [saving, setSaving]         = useState(false);
+  const [showKeyBanner, setShowKeyBanner] = useState(
+    !localStorage.getItem("syndicate-master-key")
+  );
+
+  function saveWriteKey(key) {
+    if (!key || key.length < 20) return;
+    localStorage.setItem("syndicate-master-key", key.trim());
+    setShowKeyBanner(false);
+  }
+
+  const scenario = scenarios.find(s=>s.id===activeScenId);
+
+  // Persist to storage
+  function persist(newScenarios) {
+    try {
+      localStorage.setItem("syndicate-scenarios", JSON.stringify(newScenarios));
+    } catch(e) {}
+    // Sync to JSONbin using master key stored in localStorage (never in GitHub)
+    const binKey = localStorage.getItem("syndicate-master-key") || "";
+    const binId  = "69b1c802c3097a1dd5191e0f";
+    if (binKey) {
+      const activeS = newScenarios.find(s=>s.id==="s1");
+      if (activeS) {
+        const gameState = buildGameState(activeS);
+        fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+          method:"PUT",
+          headers:{"Content-Type":"application/json","X-Master-Key":binKey,"X-Bin-Versioning":"false"},
+          body:JSON.stringify(gameState)
+        }).catch(()=>{});
+      }
+    }
+  }
+
+  function buildGameState(scenario) {
+    return {
+      scenarioId:    scenario.id,
+      scenarioName:  scenario.name,
+      setting:       scenario.setting,
+      venue:         scenario.story?.venue   || "",
+      date:          scenario.story?.date    || "",
+      victim:        scenario.story?.victim  || "",
+      premise:       scenario.story?.premise || "",
+      currentRound:  scenario.liveRound      || 0,
+      gamePhase:     scenario.gamePhase      || "lobby",
+      votingOpen:    scenario.votingOpen     || false,
+      winner:        scenario.winner         || null,
+      dispatchedClues: scenario.dispatchedClues || [],
+      votes:         scenario.votes          || {},
+      eliminatedChars: (scenario.suspects||[]).filter(s=>s.eliminated).map(s=>s.charId),
+      players:       scenario.players        || [],
+      characters:    Object.fromEntries((scenario.characters||[]).map(c=>[c.id,{
+        name:c.name, avatar:c.avatar, role:c.role,
+        position:c.position, alibi:c.alibi,
+        objective:c.objective, secret:c.secret
+      }])),
+      clues:         scenario.clues          || [],
+    };
+  }
+
+  // Load from storage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("syndicate-scenarios");
+      if (saved) setScenarios(JSON.parse(saved));
+    } catch(e) {}
+  }, []);
+
+  function updateScenario(updates) {
+    const next = scenarios.map(s => s.id===activeScenId ? {...s,...updates,lastEdited:new Date().toISOString().slice(0,10)} : s);
+    setScenarios(next);
+    persist(next);
+    setToast({ msg:"Saved", type:"success" });
+  }
+
+  function addScenario() {
+    const s = {
+      id:uid(), name:"New Scenario", setting:"Edit setting...",
+      status:"draft", players:0, lastEdited:new Date().toISOString().slice(0,10),
+      rounds:[], characters:[], clues:[], suspects:[], players:[],
+    };
+    const next = [...scenarios, s];
+    setScenarios(next);
+    persist(next);
+    setActiveScenId(s.id);
+    setActiveNav("story");
+  }
+
+  function deleteScenario(id) {
+    const next = scenarios.filter(s=>s.id!==id);
+    setScenarios(next);
+    persist(next);
+    if (activeScenId===id) setActiveScenId(next[0]?.id||null);
+  }
+
+  if (!loggedIn) return <LoginScreen onLogin={()=>setLoggedIn(true)} />;
+
+  const scenarioSections = ["story","rounds","characters","clues","suspects","players","live","preview"];
+  const showScenarioBar = scenarioSections.includes(activeNav) && scenario;
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.bgDeep, color:C.text, fontFamily:"'Playfair Display',serif", display:"flex" }}>
+
+      {/* ── WRITE KEY BANNER (shown until master key is saved) ── */}
+      {showKeyBanner && loggedIn && (
+        <div style={{position:"fixed",top:0,left:0,right:0,zIndex:200,background:"#140f00",borderBottom:`2px solid ${C.gold}`,padding:"10px 20px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <span style={{fontSize:10,letterSpacing:"0.2em",color:C.gold,textTransform:"uppercase",whiteSpace:"nowrap"}}>⚠ Write Key Required</span>
+          <span style={{fontSize:11,color:C.muted,flex:1,minWidth:180}}>Paste your JSONbin Master Key to enable live sync. Saved in this browser only — never on GitHub.</span>
+          <input id="masterKeyInput" type="password" placeholder="$2a$10$..."
+            style={{flex:2,minWidth:200,padding:"6px 10px",background:C.panel,border:`1px solid ${C.border}`,borderRadius:2,color:C.cream,fontFamily:"monospace",fontSize:12,outline:"none"}}
+          />
+          <button onClick={()=>{ const v=document.getElementById("masterKeyInput")?.value||""; saveWriteKey(v); }}
+            style={{padding:"6px 16px",background:C.gold,border:"none",borderRadius:2,color:"#1a1000",fontWeight:700,fontSize:10,letterSpacing:"0.2em",textTransform:"uppercase",cursor:"pointer",whiteSpace:"nowrap"}}>
+            Save Key
+          </button>
+          <button onClick={()=>setShowKeyBanner(false)}
+            style={{padding:"6px 10px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:2,color:C.muted,fontSize:10,cursor:"pointer"}}>
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* ── SIDEBAR ─────────────────────────────────────────── */}
+      <div style={{ width:200, background:C.bg, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", flexShrink:0 }}>
+        {/* Logo */}
+        <div style={{ padding:"22px 18px 18px", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:8, color:C.goldDim, fontFamily:"monospace", letterSpacing:4, marginBottom:4 }}>THE SYNDICATE</div>
+          <div style={{ fontSize:14, color:C.cream, fontWeight:"700", letterSpacing:1 }}>Admin Portal</div>
+          {saving && <div style={{ fontSize:8, color:C.muted, fontFamily:"monospace", marginTop:4 }}>Saving...</div>}
+        </div>
+
+        {/* Nav */}
+        <nav style={{ flex:1, padding:"12px 10px" }}>
+          {NAV.map(n => (
+            <button key={n.id} onClick={()=>setActiveNav(n.id)} style={{
+              width:"100%", background:activeNav===n.id?`${C.gold}15`:"transparent",
+              border:`1px solid ${activeNav===n.id?C.gold+"44":"transparent"}`,
+              borderRadius:6, padding:"9px 12px", marginBottom:3,
+              display:"flex", alignItems:"center", gap:10,
+              cursor:"pointer", textAlign:"left", transition:"all 0.15s",
+            }}>
+              <span style={{ fontSize:14, opacity:0.8 }}>{n.icon}</span>
+              <span style={{ fontSize:11, color:activeNav===n.id?C.gold:C.muted, fontFamily:"monospace", letterSpacing:0.5 }}>{n.label}</span>
+              {n.id==="live" && <span style={{ marginLeft:"auto", width:6, height:6, borderRadius:"50%", background:C.green, boxShadow:`0 0 6px ${C.green}` }} />}
+            </button>
+          ))}
+        </nav>
+
+        {/* User */}
+        <div style={{ padding:"14px 18px", borderTop:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:10, color:C.cream, marginBottom:2 }}>Admin</div>
+          <div style={{ fontSize:9, color:C.muted, fontFamily:"monospace", marginBottom:10 }}>admin@thesyndicate.game</div>
+          <Btn onClick={()=>setLoggedIn(false)} size="sm" variant="ghost" full>Sign Out</Btn>
+        </div>
+      </div>
+
+      {/* ── MAIN CONTENT ─────────────────────────────────────── */}
+      <div style={{ flex:1, overflow:"auto", minWidth:0 }}>
+        {/* Scenario context bar */}
+        {showScenarioBar && scenario && (
+          <div style={{ background:C.panel, borderBottom:`1px solid ${C.border}`, padding:"10px 28px", display:"flex", alignItems:"center", gap:14 }}>
+            <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2 }}>SCENARIO</div>
+            <div style={{ fontSize:13, color:C.cream, fontWeight:"600" }}>{scenario.name}</div>
+            <Badge text={scenario.status} color={scenario.status==="active"?C.green:C.amber} />
+            <Btn onClick={()=>setActiveNav("scenarios")} size="sm" variant="ghost">Switch</Btn>
+          </div>
+        )}
+
+        <div style={{ padding:28 }}>
+          {activeNav==="scenarios" && (
+            <ScenarioManager scenarios={scenarios} onSelect={id=>{setActiveScenId(id);setActiveNav("story");}} onAdd={addScenario} onDelete={deleteScenario} activeId={activeScenId} />
+          )}
+          {activeNav==="story" && scenario && (
+            <StoryEditor scenario={scenario} onChange={updateScenario} />
+          )}
+          {activeNav==="rounds" && scenario && (
+            <RoundEditor rounds={scenario.rounds} onChange={r=>updateScenario({rounds:r})} />
+          )}
+          {activeNav==="characters" && scenario && (
+            <div><SectionHead title="Characters" /><CharacterEditor characters={scenario.characters} onChange={c=>updateScenario({characters:c})} /></div>
+          )}
+          {activeNav==="clues" && scenario && (
+            <div><SectionHead title="Clues & Evidence" /><ClueEditor clues={scenario.clues} characters={scenario.characters} rounds={scenario.rounds} onChange={c=>updateScenario({clues:c})} /></div>
+          )}
+          {activeNav==="suspects" && scenario && (
+            <SuspectsEditor suspects={scenario.suspects} characters={scenario.characters} rounds={scenario.rounds} onChange={s=>updateScenario({suspects:s})} />
+          )}
+          {activeNav==="players" && scenario && (
+            <PlayerAccounts players={scenario.players} characters={scenario.characters} scenario={scenario} onChange={p=>updateScenario({players:p})} />
+          )}
+          {activeNav==="live" && scenario && (
+            <LiveControls scenario={scenario} onToast={(m,t)=>setToast({msg:m,type:t})} />
+          )}
+          {activeNav==="preview" && scenario && (
+            <PreviewMode scenario={scenario} />
+          )}
+        </div>
+      </div>
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
+    </div>
+  );
+}
+
+
+    // ── Mount app ───────────────────────────────────────────────
+    const rootEl = document.getElementById("root");
+    const root = ReactDOM.createRoot(rootEl);
+    root.render(React.createElement(AdminPortal));
+
+    // Hide loader once React renders
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const loader = document.getElementById("loader");
+        if (loader) {
+          loader.classList.add("hidden");
+          setTimeout(() => loader.remove(), 500);
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
