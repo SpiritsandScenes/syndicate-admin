@@ -395,14 +395,14 @@ function LoginScreen({ onLogin }) {
           <div style={{ fontSize:9, color:C.muted, fontFamily:"monospace", letterSpacing:2, marginBottom:24, textAlign:"center" }}>
             AUTHORISED PERSONNEL ONLY
           </div>
-          <Input label="Email" value={email} onChange={setEmail} placeholder="admin@thesyndicate.game" />
+          <Input label="Email" value={email} onChange={setEmail} placeholder="User Name" />
           <Input label="Password" value={password} onChange={setPassword} placeholder="••••••••••" />
           {error && <div style={{ fontSize:11, color:C.red, fontFamily:"monospace", marginBottom:14, textAlign:"center" }}>{error}</div>}
           <Btn onClick={handleLogin} disabled={loading} full size="lg">
             {loading ? "AUTHENTICATING..." : "ENTER THE PORTAL"}
           </Btn>
           <div style={{ textAlign:"center", marginTop:16, fontSize:10, color:C.muted, fontFamily:"monospace" }}>
-            Demo: admin@thesyndicate.game / bourbon1924
+           
           </div>
         </Card>
       </div>
