@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#06050A"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>The Syndicate</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎭</text></svg>"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&family=Josefin+Sans:wght@300;400;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:      #06050A;
+      --panel:   #0D0C14;
+      --panelLt: #131120;
+      --gold:    #C9A84C;
+      --goldDim: #6B531F;
+      --cream:   #F0E4C4;
+      --muted:   #6A6080;
+      --faint:   rgba(255,255,255,0.04);
+      --border:  rgba(201,168,76,0.15);
+      --red:     #C0392B;
+      --green:   #27AE60;
+      --blue:    #2E86C1;
+      --purp:    #8E44AD;
+      --amber:   #E67E22;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; min-height: 100vh; background: var(--bg); }
+    body {
+      font-family: 'Josefin Sans', sans-serif;
+      color: var(--cream);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ── Layout ── */
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ── Top nav bar ── */
+    .topbar {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(6,5,10,0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 54px;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 10px; }
+    .topbar-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(201,168,76,0.15);
+      border: 1px solid rgba(201,168,76,0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+      color: var(--gold);
+    }
+    .topbar-name {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--cream);
+    }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .round-badge {
+      padding: 4px 10px;
+      background: rgba(201,168,76,0.1);
+      border: 1px solid rgba(201,168,76,0.25);
+      border-radius: 20px;
+      font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase;
+      color: var(--gold);
+    }
+    .sync-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease infinite;
+    }
+    .sync-dot.offline { background: var(--red); animation: none; }
+
+    /* ── Bottom tab nav ── */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(6,5,10,0.97);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      height: 58px;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .nav-tab {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 3px;
+      padding: 6px 4px;
+      border: none; background: none; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
+      position: relative;
+    }
+    .nav-tab.active .nav-icon { color: var(--gold); }
+    .nav-tab.active .nav-label { color: var(--gold); }
+    .nav-tab:not(.active) { opacity: 0.45; }
+    .nav-icon { font-size: 18px; line-height: 1; }
+    .nav-label {
+      font-size: 8px; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .nav-badge {
+      position: absolute; top: 6px; right: calc(50% - 14px);
+      background: var(--red); color: white;
+      font-size: 9px; font-weight: 600;
+      width: 16px; height: 16px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Main scrollable content ── */
+    .content {
+      flex: 1; overflow-y: auto;
+      padding: 16px 16px 80px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ── Section title ── */
+    .section-title {
+      font-size: 9px; letter-spacing: 0.4em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-title::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(90deg, var(--goldDim), transparent);
+    }
+
+    /* ── Lobby screen ── */
+    .lobby-screen {
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center; padding: 40px 0;
+      gap: 16px;
+    }
+    .lobby-crest {
+      font-size: 48px; margin-bottom: 8px;
+      filter: drop-shadow(0 0 20px rgba(201,168,76,0.3));
+    }
+    .lobby-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px; font-weight: 700; font-style: italic;
+      color: var(--cream);
+    }
+    .lobby-setting {
+      font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase;
+      color: var(--muted); max-width: 240px;
+    }
+    .lobby-premise {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px; line-height: 1.7; color: var(--cream); opacity: 0.75;
+      max-width: 320px; font-style: italic;
+      border-left: 2px solid var(--goldDim);
+      padding-left: 16px; text-align: left;
+      margin: 8px 0;
+    }
+    .lobby-waiting {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px;
+      background: rgba(201,168,76,0.06);
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 24px;
+      font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase;
+      color: var(--gold); margin-top: 8px;
+    }
+
+    /* ── Clue cards ── */
+    .clue-list { display: flex; flex-direction: column; gap: 12px; }
+    .clue-card {
+      background: var(--faint);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 4px; padding: 16px;
+      position: relative; overflow: hidden;
+      animation: slideIn 0.4s ease both;
+    }
+    .clue-card.private {
+      background: rgba(142,68,173,0.07);
+      border-color: rgba(142,68,173,0.25);
+    }
+    .clue-card.new-clue {
+      animation: slideIn 0.4s ease both, glowPulse 1.5s ease 0.4s;
+    }
+    .clue-type-bar {
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+    .clue-header {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 8px; margin-bottom: 10px;
+    }
+    .clue-title {
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--cream); line-height: 1.3; flex: 1;
+    }
+    .clue-pill {
+      font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 10px; white-space: nowrap;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .clue-round-tag {
+      font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 8px;
+    }
+    .clue-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px; line-height: 1.65;
+      color: var(--cream); opacity: 0.88;
+    }
+    .clue-private-banner {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 8px; letter-spacing: 0.25em; text-transform: uppercase;
+      color: #b39ddb; margin-bottom: 10px;
+    }
+    .clue-private-banner::before { content: '🔒'; font-size: 10px; }
+
+    /* ── Character card tab ── */
+    .char-full {
+      background: rgba(201,168,76,0.04);
+      border: 1px solid var(--border);
+      border-radius: 4px; padding: 24px 20px;
+      margin-bottom: 16px; position: relative;
+    }
+    .char-full::before {
+      content: ''; position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    }
+    .char-avatar-lg {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: rgba(201,168,76,0.12);
+      border: 2px solid rgba(201,168,76,0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 600;
+      color: var(--gold); margin-bottom: 16px;
+    }
+    .char-name-lg {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 30px; font-weight: 700; font-style: italic;
+      color: var(--cream); margin-bottom: 4px;
+    }
+    .char-pos-lg {
+      font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 20px;
+    }
+    .info-block { margin-bottom: 20px; }
+    .info-label {
+      font-size: 8px; letter-spacing: 0.35em; text-transform: uppercase;
+      color: var(--goldDim); margin-bottom: 8px;
+    }
+    .info-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px; line-height: 1.6; color: var(--cream);
+    }
+    .info-divider {
+      height: 1px; margin: 16px 0;
+      background: linear-gradient(90deg, var(--border), transparent);
+    }
+    .secret-block {
+      background: rgba(142,68,173,0.1);
+      border: 1px solid rgba(142,68,173,0.3);
+      border-radius: 4px; padding: 16px; margin-bottom: 16px;
+    }
+    .secret-label {
+      font-size: 8px; letter-spacing: 0.35em; text-transform: uppercase;
+      color: #b39ddb; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .objective-block {
+      background: rgba(201,168,76,0.06);
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 4px; padding: 16px;
+    }
+    .objective-label {
+      font-size: 8px; letter-spacing: 0.35em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 8px;
+    }
+
+    /* ── Voting tab ── */
+    .voting-prompt {
+      background: rgba(192,57,43,0.08);
+      border: 1px solid rgba(192,57,43,0.25);
+      border-radius: 4px; padding: 16px; margin-bottom: 16px;
+      text-align: center;
+    }
+    .voting-prompt-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px; font-weight: 700; font-style: italic;
+      color: #e57373; margin-bottom: 6px;
+    }
+    .voting-prompt-sub {
+      font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase;
+      color: var(--muted);
+    }
+    .suspect-list { display: flex; flex-direction: column; gap: 10px; }
+    .suspect-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px;
+      background: var(--faint);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 4px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, border-color 0.15s;
+      position: relative;
+    }
+    .suspect-row.selected {
+      background: rgba(192,57,43,0.1);
+      border-color: rgba(192,57,43,0.4);
+    }
+    .suspect-row.eliminated {
+      opacity: 0.4; cursor: default;
+    }
+    .suspect-row.eliminated::after {
+      content: 'ELIMINATED';
+      position: absolute; right: 12px;
+      font-size: 7px; letter-spacing: 0.25em;
+      color: var(--red); text-transform: uppercase;
+    }
+    .suspect-av {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      flex-shrink: 0;
+    }
+    .suspect-info { flex: 1; min-width: 0; }
+    .suspect-name {
+      font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+      color: var(--cream); margin-bottom: 2px;
+    }
+    .suspect-pos {
+      font-size: 9px; letter-spacing: 0.15em;
+      color: var(--muted); text-transform: uppercase;
+    }
+    .vote-radio {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.15);
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s;
+    }
+    .suspect-row.selected .vote-radio {
+      border-color: var(--red);
+      background: rgba(192,57,43,0.2);
+    }
+    .vote-radio-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red); display: none;
+    }
+    .suspect-row.selected .vote-radio-dot { display: block; }
+
+    .btn-vote {
+      width: 100%; padding: 16px;
+      background: var(--red);
+      border: none; border-radius: 4px;
+      font-family: 'Josefin Sans', sans-serif;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.3em; text-transform: uppercase;
+      color: white; cursor: pointer; margin-top: 16px;
+      transition: opacity 0.2s, transform 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-vote:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-vote:not(:disabled):active { transform: scale(0.98); opacity: 0.85; }
+
+    .vote-cast-msg {
+      text-align: center; padding: 20px;
+      background: rgba(39,174,96,0.08);
+      border: 1px solid rgba(39,174,96,0.2);
+      border-radius: 4px; margin-top: 16px;
+    }
+    .vote-cast-msg h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px; font-style: italic;
+      color: #81c784; margin-bottom: 6px;
+    }
+    .vote-cast-msg p {
+      font-size: 9px; letter-spacing: 0.25em;
+      text-transform: uppercase; color: var(--muted);
+    }
+
+    .voting-closed {
+      text-align: center; padding: 40px 20px;
+    }
+    .voting-closed p {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 20px; font-style: italic;
+      color: var(--muted);
+    }
+
+    /* ── Game over screen ── */
+    .game-over {
+      display: flex; flex-direction: column;
+      align-items: center; text-align: center;
+      padding: 40px 16px; gap: 16px;
+    }
+    .game-over-icon { font-size: 52px; }
+    .game-over-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 34px; font-weight: 700; font-style: italic;
+      color: var(--cream);
+    }
+    .game-over-sub {
+      font-size: 9px; letter-spacing: 0.35em; text-transform: uppercase;
+      color: var(--muted);
+    }
+    .killer-reveal {
+      background: rgba(192,57,43,0.08);
+      border: 1px solid rgba(192,57,43,0.25);
+      border-radius: 4px; padding: 20px; width: 100%; max-width: 320px;
+      text-align: center;
+    }
+    .killer-reveal-label {
+      font-size: 8px; letter-spacing: 0.35em; text-transform: uppercase;
+      color: var(--red); margin-bottom: 8px;
+    }
+    .killer-reveal-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 26px; font-weight: 700; font-style: italic;
+      color: var(--cream);
+    }
+
+    /* ── Empty states ── */
+    .empty-state {
+      text-align: center; padding: 48px 24px;
+      color: var(--muted);
+    }
+    .empty-state-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
+    .empty-state p {
+      font-size: 10px; letter-spacing: 0.25em;
+      text-transform: uppercase; line-height: 1.7;
+    }
+
+    /* ── Animations ── */
+    @keyframes slideIn    { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes glowPulse  { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 20px rgba(201,168,76,0.15)} }
+    @keyframes pulse      { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    @keyframes spin       { to { transform:rotate(360deg); } }
+    @keyframes fadeIn     { from{opacity:0} to{opacity:1} }
+
+    .spinner {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2px solid rgba(201,168,76,0.15);
+      border-top-color: var(--gold);
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+
+    /* ── Toast notifications ── */
+    .toast {
+      position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%);
+      padding: 10px 20px;
+      background: var(--panel); border: 1px solid var(--gold);
+      border-radius: 24px;
+      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--gold); white-space: nowrap; z-index: 200;
+      animation: fadeIn 0.3s ease;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- Injected by JS -->
+  <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;">
+    <div class="spinner"></div>
+    <div style="font-size:9px;letter-spacing:0.35em;color:var(--muted);text-transform:uppercase;">Loading</div>
+  </div>
+</div>
+
+<script src="../syndicate-data.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
+const CODE   = params.get("code") || "";
+let G        = null;  // game state
+let PLAYER   = null;  // current player
+let CHAR     = null;  // current character
+let activeTab= "clues";
+let myVotes  = {};    // { roundNumber: charId }
+let pollTimer= null;
+let prevDispatchCount = 0;
+let isOnline = true;
+
+// ── Init ────────────────────────────────────────────────────────
+async function init() {
+  if (!CODE) {
+    const base = window.location.href.replace(/\/play\/?.*/, "");
+    window.location.href = `${base}/join/`;
+    return;
+  }
+  G = await SyndicateSync.read();
+  PLAYER = getPlayerByCode(G, CODE);
+  if (!PLAYER) {
+    const base = window.location.href.replace(/\/play\/?.*/, "");
+    window.location.href = `${base}/join/?error=invalid`;
+    return;
+  }
+  CHAR = G.characters[PLAYER.character];
+  prevDispatchCount = G.dispatchedClues.length;
+  render();
+  // Start polling
+  pollTimer = SyndicateSync.poll(onStateUpdate, 4000);
+}
+
+function onStateUpdate(newState) {
+  const newClues = newState.dispatchedClues.length > prevDispatchCount;
+  G = newState;
+  prevDispatchCount = G.dispatchedClues.length;
+  render();
+  if (newClues) showToast("New clue received");
+  isOnline = true;
+  updateSyncDot(true);
+}
+
+function updateSyncDot(online) {
+  const dot = document.getElementById("sync-dot");
+  if (dot) { dot.className = "sync-dot" + (online ? "" : " offline"); }
+}
+
+function showToast(msg) {
+  const existing = document.querySelector(".toast");
+  if (existing) existing.remove();
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
+}
+
+// ── Main render ─────────────────────────────────────────────────
+function render() {
+  const phase = G.gamePhase;
+
+  if (phase === "ended" || G.currentRound > 5) {
+    renderGameOver();
+    return;
+  }
+
+  document.getElementById("app").innerHTML = `
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-avatar">${CHAR.avatar}</div>
+        <div class="topbar-name">${CHAR.name.split(" ").slice(-1)[0]}</div>
+      </div>
+      <div class="topbar-right">
+        ${G.currentRound > 0 ?
+          `<div class="round-badge">Round ${G.currentRound} — ${getRoundLabel(G.currentRound)}</div>` :
+          `<div class="round-badge">Lobby</div>`
+        }
+        <div class="sync-dot" id="sync-dot"></div>
+      </div>
+    </div>
+
+    <div class="content" id="tab-content"></div>
+
+    <nav class="bottom-nav">
+      <button class="nav-tab${activeTab==="clues"?"  active":""}" onclick="switchTab('clues')">
+        <span class="nav-icon">📜</span>
+        <span class="nav-label">Evidence</span>
+        ${getNewClueCount() > 0 ? `<span class="nav-badge">${getNewClueCount()}</span>` : ""}
+      </button>
+      <button class="nav-tab${activeTab==="character"?" active":""}" onclick="switchTab('character')">
+        <span class="nav-icon">🎭</span>
+        <span class="nav-label">Character</span>
+      </button>
+      <button class="nav-tab${activeTab==="vote"?"     active":""}" onclick="switchTab('vote')">
+        <span class="nav-icon">⚖️</span>
+        <span class="nav-label">Vote</span>
+        ${G.votingOpen && !myVotes[G.currentRound] ? `<span class="nav-badge">!</span>` : ""}
+      </button>
+      <button class="nav-tab${activeTab==="suspects"?" active":""}" onclick="switchTab('suspects')">
+        <span class="nav-icon">👁</span>
+        <span class="nav-label">Suspects</span>
+      </button>
+    </nav>
+  `;
+  renderTab();
+}
+
+let seenClues = new Set(JSON.parse(localStorage.getItem("seen-clues-"+CODE)||"[]"));
+function getNewClueCount() {
+  const mine = getCluesForPlayer(G, PLAYER.character);
+  return mine.filter(c => !seenClues.has(c.id)).length;
+}
+function markCluesSeen() {
+  const mine = getCluesForPlayer(G, PLAYER.character);
+  mine.forEach(c => seenClues.add(c.id));
+  localStorage.setItem("seen-clues-"+CODE, JSON.stringify([...seenClues]));
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  if (tab === "clues") markCluesSeen();
+  renderTab();
+  // Update active state on nav buttons
+  document.querySelectorAll(".nav-tab").forEach(btn => {
+    btn.classList.remove("active");
+  });
+  const tabs = ["clues","character","vote","suspects"];
+  const idx = tabs.indexOf(tab);
+  const navBtns = document.querySelectorAll(".nav-tab");
+  if (navBtns[idx]) navBtns[idx].classList.add("active");
+  // Update nav badges
+  document.querySelectorAll(".nav-badge").forEach(b => b.remove());
+  if (getNewClueCount() > 0 && tab !== "clues") {
+    navBtns[0]?.insertAdjacentHTML("beforeend",`<span class="nav-badge">${getNewClueCount()}</span>`);
+  }
+  if (G.votingOpen && !myVotes[G.currentRound] && tab !== "vote") {
+    navBtns[2]?.insertAdjacentHTML("beforeend",`<span class="nav-badge">!</span>`);
+  }
+}
+
+function renderTab() {
+  const tc = document.getElementById("tab-content");
+  if (!tc) return;
+  if (activeTab === "clues")     renderClues(tc);
+  else if (activeTab === "character") renderCharacter(tc);
+  else if (activeTab === "vote")      renderVote(tc);
+  else if (activeTab === "suspects")  renderSuspects(tc);
+}
+
+// ── CLUES TAB ───────────────────────────────────────────────────
+function renderClues(el) {
+  markCluesSeen();
+  if (G.currentRound === 0 || G.gamePhase === "lobby") {
+    el.innerHTML = `
+      <div class="lobby-screen">
+        <div class="lobby-crest">🎭</div>
+        <div class="lobby-title">${G.scenarioName}</div>
+        <div class="lobby-setting">${G.setting}</div>
+        <div class="lobby-premise">${G.premise}</div>
+        <div class="lobby-waiting">
+          <div class="sync-dot"></div>
+          Waiting for the host to begin
+        </div>
+      </div>
+    `;
+    return;
+  }
+  const myClues = getCluesForPlayer(G, PLAYER.character);
+  if (myClues.length === 0) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <p>No evidence has been<br>dispatched yet.<br><br>Stand by.</p>
+      </div>
+    `;
+    return;
+  }
+  const typeColors = { dispatch:"#C9A84C", evidence:"#2E86C1", private:"#8E44AD", tip:"#27AE60", final:"#C0392B" };
+  const typeLabels = { dispatch:"Dispatch", evidence:"Evidence", private:"Private", tip:"Tip", final:"Final" };
+  el.innerHTML = `
+    <div class="section-title">Evidence — Round ${G.currentRound}</div>
+    <div class="clue-list">
+      ${[...myClues].reverse().map(cl => {
+        const color = typeColors[cl.type] || "#7A7090";
+        const label = typeLabels[cl.type] || cl.type;
+        const isPriv = cl.private;
+        return `
+          <div class="clue-card${isPriv?" private":""}">
+            <div class="clue-type-bar" style="background:${color}"></div>
+            <div class="clue-header">
+              <div class="clue-title">${cl.title}</div>
+              <div class="clue-pill" style="background:${color}22;color:${color};border:1px solid ${color}44">${label}</div>
+            </div>
+            ${isPriv ? `<div class="clue-private-banner">Eyes only — do not share</div>` : ""}
+            <div class="clue-round-tag">Round ${cl.round} · ${cl.time||""}</div>
+            <div class="clue-text">${cl.text}</div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+// ── CHARACTER TAB ───────────────────────────────────────────────
+function renderCharacter(el) {
+  el.innerHTML = `
+    <div class="section-title">Your Character</div>
+    <div class="char-full">
+      <div class="char-avatar-lg">${CHAR.avatar}</div>
+      <div class="char-name-lg">${CHAR.name}</div>
+      <div class="char-pos-lg">${CHAR.position}</div>
+
+      <div class="info-block">
+        <div class="info-label">Alibi</div>
+        <div class="info-text">${CHAR.alibi}</div>
+      </div>
+      <div class="info-divider"></div>
+    </div>
+
+    <div class="secret-block">
+      <div class="secret-label">🔒 Your Secret — Eyes Only</div>
+      <div class="info-text">${CHAR.secret}</div>
+    </div>
+
+    <div class="objective-block">
+      <div class="objective-label">Your Objective</div>
+      <div class="info-text">${CHAR.objective}</div>
+    </div>
+  `;
+}
+
+// ── VOTE TAB ─────────────────────────────────────────────────────
+function renderVote(el) {
+  const round = G.currentRound;
+  const alreadyVoted = myVotes[round];
+  const isOpen = G.votingOpen;
+  const eliminated = G.eliminatedChars || [];
+
+  if (!isOpen && !alreadyVoted) {
+    el.innerHTML = `
+      <div class="voting-closed">
+        <p>Voting is not yet open.<br>The host will open the vote when ready.</p>
+      </div>
+    `;
+    return;
+  }
+
+  // All suspects (non-eliminated, not yourself)
+  const suspects = Object.entries(G.characters)
+    .filter(([id]) => id !== PLAYER.character)
+    .map(([id, c]) => ({ id, ...c, isEliminated: eliminated.includes(id) }))
+    .sort((a,b) => a.name.localeCompare(b.name));
+
+  const selectedId = myVotes[round] || null;
+
+  el.innerHTML = `
+    <div class="voting-prompt">
+      <div class="voting-prompt-title">Cast Your Vote</div>
+      <div class="voting-prompt-sub">Round ${round} · ${getRoundLabel(round)}</div>
+    </div>
+
+    ${alreadyVoted ? `
+      <div class="vote-cast-msg">
+        <h3>Vote Cast</h3>
+        <p>Awaiting other players</p>
+      </div>
+    ` : ""}
+
+    <div class="suspect-list">
+      ${suspects.map(s => `
+        <div class="suspect-row${s.id===selectedId?" selected":""}${s.isEliminated?" eliminated":""}"
+             onclick="${s.isEliminated||alreadyVoted?"":"selectVote('"+s.id+"')"}">
+          <div class="suspect-av">${s.avatar}</div>
+          <div class="suspect-info">
+            <div class="suspect-name">${s.name}</div>
+            <div class="suspect-pos">${s.position}</div>
+          </div>
+          <div class="vote-radio"><div class="vote-radio-dot"></div></div>
+        </div>
+      `).join("")}
+    </div>
+
+    ${!alreadyVoted ? `
+      <button class="btn-vote" id="voteBtn"
+        ${selectedId ? "" : "disabled"}
+        onclick="submitVote()">
+        Accuse ${selectedId ? G.characters[selectedId]?.name : "—"}
+      </button>
+    ` : ""}
+  `;
+}
+
+function selectVote(charId) {
+  const round = G.currentRound;
+  myVotes[round] = charId;
+  renderVote(document.getElementById("tab-content"));
+}
+
+async function submitVote() {
+  const round = G.currentRound;
+  const charId = myVotes[round];
+  if (!charId) return;
+  // Write vote to game state
+  if (!G.votes) G.votes = {};
+  if (!G.votes[round]) G.votes[round] = {};
+  G.votes[round][PLAYER.id] = charId;
+  await SyndicateSync.write(G);
+  showToast("Vote submitted");
+  renderVote(document.getElementById("tab-content"));
+}
+
+// ── SUSPECTS TAB ─────────────────────────────────────────────────
+function renderSuspects(el) {
+  const eliminated = G.eliminatedChars || [];
+  const suspects = Object.entries(G.characters)
+    .map(([id,c]) => ({ id, ...c, isEliminated: eliminated.includes(id) }))
+    .sort((a,b) => a.isEliminated - b.isEliminated || a.name.localeCompare(b.name));
+
+  el.innerHTML = `
+    <div class="section-title">All Suspects</div>
+    <div class="suspect-list">
+      ${suspects.map(s => `
+        <div class="suspect-row${s.isEliminated?" eliminated":""}">
+          <div class="suspect-av">${s.avatar}</div>
+          <div class="suspect-info">
+            <div class="suspect-name">${s.name}${s.id===PLAYER.character?" (You)":""}</div>
+            <div class="suspect-pos">${s.position}</div>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+// ── GAME OVER ───────────────────────────────────────────────────
+function renderGameOver() {
+  const won = G.winner === "civilians";
+  const killer = Object.entries(G.characters).find(([id]) => G.characters[id].role === "KILLER");
+  const killerName = killer ? killer[1].name : "Unknown";
+
+  document.getElementById("app").innerHTML = `
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;gap:20px;background:var(--bg);">
+      <div class="game-over-icon">${won ? "🎉" : "💀"}</div>
+      <div class="game-over-title">${won ? "Justice Served" : "The Killer Escapes"}</div>
+      <div class="game-over-sub">${won ? "The Syndicate found the killer" : "Dominic Caruso walks free"}</div>
+      <div class="killer-reveal">
+        <div class="killer-reveal-label">The Killer Was</div>
+        <div class="killer-reveal-name">${killerName}</div>
+      </div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:15px;line-height:1.7;color:var(--cream);opacity:0.7;max-width:300px;font-style:italic;">
+        ${won
+          ? "Angelo Marchetti is avenged. The Syndicate has spoken."
+          : "Dominic Caruso slips into the Chicago night. The Marchetti Syndicate will never be the same."}
+      </div>
+    </div>
+  `;
+}
+
+init();
+</script>
+</body>
+</html>
