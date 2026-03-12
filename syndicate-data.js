@@ -1,14 +1,20 @@
-// ═══════════════════════════════════════════════════════════════
-//  THE SYNDICATE — Shared Game Data & JSONbin Sync
-//  Used by: join/index.html, play/index.html, screen/index.html
-//  Admin portal (index.html) also writes to the same JSONbin
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  THE SYNDICATE — Murder Mystery Game Platform
+//  Copyright (c) 2026 Spirits & Scenes. All rights reserved.
+//
+//  This software and its contents — including but not limited to game
+//  mechanics, scenario text, character designs, clue scripts, voting
+//  systems, and all associated assets — are proprietary and confidential
+//  to Spirits & Scenes.
+//
+//  Unauthorized copying, distribution, modification, sublicensing, or
+//  commercial use of any part of this software, in whole or in part,
+//  without express written permission from Spirits & Scenes, is strictly
+//  prohibited.
+//
+//  Licensing & contact: hudsonsproductions@outlook.com
+// ═══════════════════════════════════════════════════════════════════
 
-// ── JSONbin configuration ────────────────────────────────────────
-// After creating a free account at jsonbin.io:
-// 1. Create a new bin with the SEED_STATE JSON below
-// 2. Set it to PUBLIC
-// 3. Paste your Bin ID and API key here
 const JSONBIN_ID       = "69b1c802c3097a1dd5191e0f";
 const JSONBIN_READ_KEY = "$2a$10$yL93zx9EFukLZzNy5w2Vz.TsyLYHJlzrPq/CAoux8bGzZCRN3xKyO";
 const JSONBIN_URL      = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
