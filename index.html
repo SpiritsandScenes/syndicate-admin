@@ -29,7 +29,7 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
   <!-- Babel Standalone for JSX transpilation in-browser -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -250,6 +250,68 @@ const SEED_SCENARIOS = [
 const CLUE_TYPES = ["dispatch","evidence","private","tip","final"];
 const ROLE_TYPES  = ["CIVILIAN","KILLER","CONSIGLIERE","LOOKOUT"];
 const ROLE_COLORS = { CIVILIAN:C.green, KILLER:C.red, CONSIGLIERE:C.amber, LOOKOUT:C.blue };
+const MAX_CHARACTERS = 30;
+
+// ── Filler "extra guest" templates — for scaling a scenario up past its
+// written main cast without inventing plot-critical content per head. ────
+const FILLER_TEMPLATES = [
+  { name:"Vittorio Bellandi", position:"Syndicate Associate" },
+  { name:"Nadia Rossi",       position:"Distillery Manager" },
+  { name:"Salvatore Greco",   position:"Import/Export Broker" },
+  { name:"Isabella Conti",    position:"Torch Singer's Understudy" },
+  { name:"Marco Delgado",     position:"Card Dealer" },
+  { name:"Giulia Esposito",   position:"Cigarette Girl" },
+  { name:"Renzo Adami",       position:"Doorman" },
+  { name:"Colette Fournier",  position:"Visiting Socialite" },
+  { name:"Ezra Blackwood",    position:"Speakeasy Pianist" },
+  { name:"Dahlia Vance",      position:"Coat-Check Girl" },
+  { name:"Otto Reinholt",     position:"Bootlegger's Courier" },
+  { name:"Mabel Sinclair",    position:"Society Photographer" },
+  { name:"Louis Faraday",     position:"Bank Clerk" },
+  { name:"Bianca Wren",       position:"Hatcheck Attendant" },
+  { name:"Julian Ashcombe",   position:"Family Lawyer" },
+  { name:"Rosalind Hart",     position:"Chorus Girl" },
+  { name:"Nikolai Petrov",    position:"Rival Family Envoy" },
+  { name:"Odette Marchand",   position:"Perfume Merchant" },
+  { name:"Cyrus Bellweather", position:"City Alderman" },
+  { name:"Fiora Castellano",  position:"Family Seamstress" },
+];
+const FILLER_ALIBIS = [
+  "Mingling near the bar most of the evening. A few people can vaguely place you there.",
+  "Stepped out for air on the terrace between 9:30 and 10:00 PM.",
+  "Playing cards in the back room until the commotion started.",
+  "Helping the staff in the kitchen — you know your way around, oddly well.",
+  "Watching the stage show from the back, close to the exit.",
+  "Deep in conversation with someone you'd rather not name.",
+];
+const FILLER_SECRETS = [
+  "You owe the Syndicate a debt you haven't mentioned to anyone tonight.",
+  "You recognised someone here from a life you've tried to leave behind.",
+  "You've heard whispers about missing money, but nothing solid enough to repeat.",
+  "You saw something odd near the barrel room earlier — you're still deciding whether it matters.",
+  "You had your own reasons to want Angelo gone, though you never acted on them.",
+  "You're not entirely who you say you are tonight.",
+];
+const FILLER_OBJECTIVE = "Blend in, listen carefully, and vote to find Angelo's real killer. If accused, defend yourself calmly — you didn't do it.";
+
+function generateFillerCharacters(existingCount, n) {
+  const out = [];
+  for (let i=0; i<n; i++) {
+    const idx = existingCount + i;
+    const tmpl = FILLER_TEMPLATES[idx % FILLER_TEMPLATES.length];
+    const suffix = idx >= FILLER_TEMPLATES.length ? ` ${Math.floor(idx/FILLER_TEMPLATES.length)+1}` : "";
+    const name = `${tmpl.name}${suffix}`;
+    out.push({
+      id: uid(), name, avatar: name.split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase(),
+      role:"CIVILIAN", roleColor:C.green, position: tmpl.position,
+      alibi: FILLER_ALIBIS[idx % FILLER_ALIBIS.length],
+      objective: FILLER_OBJECTIVE,
+      secret: FILLER_SECRETS[idx % FILLER_SECRETS.length],
+      tier: "extra",
+    });
+  }
+  return out;
+}
 
 // ── Utilities ─────────────────────────────────────────────────────
 function uid() { return Math.random().toString(36).slice(2,9); }
@@ -536,6 +598,9 @@ function RoundEditor({ rounds, onChange }) {
 function CharacterEditor({ characters, onChange }) {
   const [selected, setSelected] = useState(null);
   const [draft, setDraft]       = useState(null);
+  const [addN, setAddN]         = useState(5);
+
+  const room = Math.max(0, MAX_CHARACTERS - characters.length);
 
   function select(c) { setSelected(c.id); setDraft({...c}); }
   function save() {
@@ -543,9 +608,15 @@ function CharacterEditor({ characters, onChange }) {
     setDraft({...draft});
   }
   function addChar() {
-    const c = { id:uid(), name:"New Character", avatar:"NC", role:"CIVILIAN", roleColor:C.green, position:"", alibi:"", objective:"", secret:"" };
+    const c = { id:uid(), name:"New Character", avatar:"NC", role:"CIVILIAN", roleColor:C.green, position:"", alibi:"", objective:"", secret:"", tier:"main" };
     onChange([...characters, c]);
     select(c);
+  }
+  function addExtraGuests() {
+    const n = Math.max(1, Math.min(addN, room));
+    if (n<=0) return;
+    const extras = generateFillerCharacters(characters.length, n);
+    onChange([...characters, ...extras]);
   }
   function deleteChar(id) {
     onChange(characters.filter(c=>c.id!==id));
@@ -557,9 +628,23 @@ function CharacterEditor({ characters, onChange }) {
       {/* Left list */}
       <div>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2 }}>CHARACTERS ({characters.length})</div>
-          <Btn onClick={addChar} size="sm">+</Btn>
+          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2 }}>CHARACTERS ({characters.length}/{MAX_CHARACTERS})</div>
+          <Btn onClick={addChar} size="sm" disabled={room<=0}>+</Btn>
         </div>
+
+        {/* Bulk "extra guest" generator — scales past the written main cast */}
+        <div style={{ background:C.panelLt, border:`1px solid ${C.border}`, borderRadius:6, padding:"10px 12px", marginBottom:12 }}>
+          <div style={{ fontSize:9, color:C.muted, marginBottom:8, lineHeight:1.5 }}>
+            Add generic "extra guest" civilians to fill out headcount for a bigger group — up to {MAX_CHARACTERS} total. They get a light alibi/objective/secret, not plot-critical content.
+          </div>
+          <div style={{ display:"flex", gap:6 }}>
+            <input type="number" min="1" max={room} value={addN}
+              onChange={e=>setAddN(Math.max(1, Number(e.target.value)||1))}
+              style={{ width:56, background:C.bg, border:`1px solid ${C.border}`, color:C.text, borderRadius:4, padding:"6px 8px", fontSize:11, fontFamily:"monospace", outline:"none" }} />
+            <Btn onClick={addExtraGuests} size="sm" full disabled={room<=0}>{room<=0?"Full (30/30)":`+ Add ${Math.max(1,Math.min(addN,room))} Extra Guest${Math.max(1,Math.min(addN,room))!==1?"s":""}`}</Btn>
+          </div>
+        </div>
+
         <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
           {characters.map(c => (
             <div key={c.id} onClick={()=>select(c)} style={{
@@ -571,7 +656,10 @@ function CharacterEditor({ characters, onChange }) {
               <div style={{ width:30, height:30, borderRadius:"50%", background:`${ROLE_COLORS[c.role]||C.green}22`, border:`1.5px solid ${ROLE_COLORS[c.role]||C.green}55`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, color:C.cream, flexShrink:0 }}>{c.avatar}</div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:11, color:C.cream, fontWeight:"600", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.name}</div>
-                <Badge text={c.role} color={ROLE_COLORS[c.role]||C.green} small />
+                <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginTop:2 }}>
+                  <Badge text={c.role} color={ROLE_COLORS[c.role]||C.green} small />
+                  {c.tier==="extra" && <Badge text="extra" color={C.muted} small />}
+                </div>
               </div>
             </div>
           ))}
@@ -1274,8 +1362,10 @@ function PlayerAccounts({ players, characters, scenario, onChange }) {
     onChange(players.map(p=>p.id===id?{...p,code:generateCode()}:p));
   }
 
-  const selectedPlayer = players.find(p=>p.id===viewCard);
-  const selectedChar   = characters.find(c=>c.id===selectedPlayer?.character);
+  const selectedPlayer  = players.find(p=>p.id===viewCard);
+  const selectedChar    = characters.find(c=>c.id===selectedPlayer?.character);
+  const assignedCharIds = new Set(players.map(p=>p.character));
+  const availableChars  = characters.filter(c=>!assignedCharIds.has(c.id));
 
   return (
     <div>
@@ -1296,6 +1386,13 @@ function PlayerAccounts({ players, characters, scenario, onChange }) {
         </div>
       </div>
 
+      <div style={{ fontSize:11, color:C.muted, fontFamily:"monospace", marginBottom:14 }}>
+        {players.length} player{players.length!==1?"s":""} assigned · {characters.length} character{characters.length!==1?"s":""} defined (max {MAX_CHARACTERS})
+        {availableChars.length===0 && characters.length>0 && (
+          <span style={{ color:C.amber }}> — no unassigned characters left. Add more, or extra guests, in the Characters tab.</span>
+        )}
+      </div>
+
       {/* Add player form */}
       <Card style={{ padding:18, marginBottom:20 }}>
         <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:14 }}>ADD PLAYER</div>
@@ -1305,7 +1402,7 @@ function PlayerAccounts({ players, characters, scenario, onChange }) {
             <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>ASSIGN CHARACTER</div>
             <select value={newChar} onChange={e=>setNewChar(e.target.value)} style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, color:C.text, borderRadius:4, padding:"9px 12px", fontSize:12, fontFamily:"monospace", outline:"none" }}>
               <option value="">Select...</option>
-              {characters.map(c=><option key={c.id} value={c.id}>{c.name} ({c.role})</option>)}
+              {availableChars.map(c=><option key={c.id} value={c.id}>{c.name} ({c.role})</option>)}
             </select>
           </div>
           <div style={{ marginBottom:14 }}>
@@ -1424,13 +1521,11 @@ function PlayerAccounts({ players, characters, scenario, onChange }) {
 // ══════════════════════════════════════════════════════════════════
 // LIVE GAME CONTROLS
 // ══════════════════════════════════════════════════════════════════
-function LiveControls({ scenario, onToast }) {
-  const [round, setRound]           = useState(3);
-  const [phase, setPhase]           = useState("interrogation");
-  const [timer, setTimer]           = useState(420);
-  const [timerOn, setTimerOn]       = useState(false);
-  const [votedCount, setVotedCount] = useState(4);
-  const [sentClues, setSentClues]   = useState(new Set());
+function LiveControls({ scenario, onChange, onToast }) {
+  // Host-side pacing aid only — not synced, not shown to players.
+  const [timer, setTimer]       = useState(600);
+  const [timerOn, setTimerOn]   = useState(false);
+  const [voteChar, setVoteChar] = useState("");
 
   useEffect(() => {
     if (!timerOn || timer<=0) return;
@@ -1439,24 +1534,88 @@ function LiveControls({ scenario, onToast }) {
   },[timerOn,timer]);
 
   const fmt = s=>`${Math.floor(s/60).toString().padStart(2,"0")}:${(s%60).toString().padStart(2,"0")}`;
-  const activeCount = scenario.suspects.filter(s=>!s.eliminated).length;
-  const roundClues = scenario.clues.filter(c=>c.round===round);
-  const timerCol = timer<60?C.red:timer<120?C.amber:C.cream;
 
+  // ── Real, synced game state — this is what play/ and screen/ actually read ──
+  const liveRound   = scenario.liveRound || 0;   // 0 = lobby, not yet started
+  const gamePhase   = scenario.gamePhase || "lobby";
+  const votingOpen  = !!scenario.votingOpen;
+  const dispatched  = scenario.dispatchedClues || [];
+  const votesThisRd = (scenario.votes||{})[liveRound] || {};
+  const started     = liveRound > 0 && gamePhase !== "lobby";
+  const ended        = gamePhase === "ended";
+
+  const activeCount = scenario.suspects.filter(s=>!s.eliminated).length;
+  const roundClues  = scenario.clues.filter(c=>c.round===liveRound);
+  const timerCol    = timer<60?C.red:timer<120?C.amber:C.cream;
+
+  function startGame() {
+    onChange({ liveRound:1, gamePhase:"round", votingOpen:false, winner:null, dispatchedClues:[], votes:{} });
+    onToast("Game started — Round 1 is now live on all devices", "success");
+  }
+  function goToRound(r) {
+    if (r<1 || r>5) return;
+    onChange({ liveRound:r, gamePhase:"round", votingOpen:false });
+    onToast(`Round ${r} is now live`, "success");
+  }
+  function toggleVoting() {
+    const next = !votingOpen;
+    onChange({ votingOpen:next, gamePhase: next?"voting":"round" });
+    onToast(next?"Voting opened on all devices":"Voting closed", "success");
+  }
   function sendClue(id) {
-    setSentClues(s=>new Set([...s,id]));
+    if (dispatched.includes(id)) return;
     const c = scenario.clues.find(x=>x.id===id);
+    onChange({ dispatchedClues:[...dispatched, id] });
     onToast(`Sent: "${c?.title}"`, "success");
+  }
+  function recordVote() {
+    if (!voteChar) return;
+    const votes = { ...(scenario.votes||{}) };
+    const roundVotes = { ...(votes[liveRound]||{}) };
+    roundVotes[`host-${Object.keys(roundVotes).length+1}`] = voteChar;
+    votes[liveRound] = roundVotes;
+    onChange({ votes });
+    onToast(`Vote recorded for ${scenario.characters.find(c=>c.id===voteChar)?.name}`, "success");
+    setVoteChar("");
+  }
+  function clearRoundVotes() {
+    const votes = { ...(scenario.votes||{}) };
+    votes[liveRound] = {};
+    onChange({ votes });
+  }
+  function declareWinner(who) {
+    onChange({ winner:who, gamePhase:"ended" });
+    onToast(who==="civilians" ? "Civilians win — revealed on all devices" : "Killer wins — revealed on all devices", "success");
+  }
+  function newSession() {
+    onChange({
+      liveRound:0, gamePhase:"lobby", votingOpen:false, winner:null, dispatchedClues:[], votes:{},
+      suspects: scenario.suspects.map(s=>({...s, eliminated:false, eliminatedRound:null})),
+    });
+    onToast("Session reset — ready to run again", "success");
   }
 
   return (
     <div>
       <SectionHead title="Live Game Controls" />
+
+      {/* Status strip */}
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14, padding:"10px 14px", background:C.panelLt, border:`1px solid ${C.border}`, borderRadius:6 }}>
+        <div style={{ width:8, height:8, borderRadius:"50%", background: started?(ended?C.muted:C.green):C.amber, boxShadow: started&&!ended?`0 0 6px ${C.green}`:undefined, flexShrink:0 }} />
+        <div style={{ fontSize:11, color:C.text, fontFamily:"monospace" }}>
+          {ended ? "GAME ENDED — reveal is live on all devices" : started ? `LIVE — Round ${liveRound} · ${votingOpen?"Voting open":gamePhase}` : "NOT STARTED — players are still seeing the lobby screen"}
+        </div>
+        <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+          {!started && <Btn onClick={startGame} size="sm">▶ Start Game</Btn>}
+          {started && <Btn onClick={newSession} size="sm" variant="ghost">↻ New Session</Btn>}
+        </div>
+      </div>
+
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14, marginBottom:14 }}>
 
         {/* Timer */}
         <Card style={{ padding:18, textAlign:"center" }}>
-          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>ROUND TIMER</div>
+          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>ROUND TIMER <span style={{ color:C.muted }}>(host only)</span></div>
           <div style={{ fontSize:48, fontFamily:"monospace", fontWeight:"bold", color:timerCol, lineHeight:1, marginBottom:4, textShadow:timer<60?`0 0 20px ${C.red}`:undefined }}>{fmt(timer)}</div>
           <div style={{ height:4, background:C.faint, borderRadius:2, marginBottom:14, overflow:"hidden" }}>
             <div style={{ height:"100%", background:`linear-gradient(90deg,${C.gold},#A87830)`, width:`${(timer/600)*100}%`, borderRadius:2, transition:"width 1s linear" }} />
@@ -1467,48 +1626,71 @@ function LiveControls({ scenario, onToast }) {
           </div>
         </Card>
 
-        {/* Round control */}
+        {/* Round control — synced to players */}
         <Card style={{ padding:18 }}>
           <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>ROUND CONTROL</div>
           <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:14 }}>
-            <Btn onClick={()=>setRound(r=>Math.max(1,r-1))} size="sm" variant="ghost">‹</Btn>
+            <Btn onClick={()=>goToRound(liveRound-1)} size="sm" variant="ghost" disabled={liveRound<=1}>‹</Btn>
             <div style={{ flex:1, textAlign:"center" }}>
-              <div style={{ fontSize:32, fontFamily:"monospace", fontWeight:"bold", color:C.cream, lineHeight:1 }}>{round}</div>
+              <div style={{ fontSize:32, fontFamily:"monospace", fontWeight:"bold", color:C.cream, lineHeight:1 }}>{liveRound||"—"}</div>
               <div style={{ fontSize:10, color:C.gold, fontFamily:"monospace" }}>OF 5</div>
             </div>
-            <Btn onClick={()=>setRound(r=>Math.min(5,r+1))} size="sm" variant="ghost">›</Btn>
+            <Btn onClick={()=>goToRound(liveRound+1)} size="sm" variant="ghost" disabled={!started||liveRound>=5}>›</Btn>
           </div>
-          <div style={{ fontSize:12, color:C.cream, fontWeight:"600", marginBottom:4 }}>{scenario.rounds[round-1]?.title||"—"}</div>
-          <div style={{ fontSize:10, color:C.muted, fontFamily:"monospace" }}>{scenario.rounds[round-1]?.timing}</div>
+          <div style={{ fontSize:12, color:C.cream, fontWeight:"600", marginBottom:4 }}>{scenario.rounds[liveRound-1]?.title||"—"}</div>
+          <div style={{ fontSize:10, color:C.muted, fontFamily:"monospace" }}>{scenario.rounds[liveRound-1]?.timing}</div>
         </Card>
 
         {/* Voting */}
         <Card style={{ padding:18 }}>
-          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>VOTING</div>
+          <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>VOTING — ROUND {liveRound||"—"}</div>
           <div style={{ textAlign:"center", marginBottom:10 }}>
-            <div style={{ fontSize:36, fontFamily:"monospace", fontWeight:"bold", color:C.cream, lineHeight:1 }}>{votedCount}<span style={{ fontSize:18, color:C.muted }}>/{activeCount}</span></div>
+            <div style={{ fontSize:36, fontFamily:"monospace", fontWeight:"bold", color:C.cream, lineHeight:1 }}>{Object.keys(votesThisRd).length}<span style={{ fontSize:18, color:C.muted }}>/{activeCount}</span></div>
             <div style={{ fontSize:9, color:C.gold, fontFamily:"monospace", letterSpacing:1, marginTop:2 }}>VOTES CAST</div>
           </div>
           <div style={{ height:4, background:C.faint, borderRadius:2, marginBottom:12, overflow:"hidden" }}>
-            <div style={{ height:"100%", background:`linear-gradient(90deg,${C.red},#C03030)`, width:`${(votedCount/activeCount)*100}%`, borderRadius:2 }} />
+            <div style={{ height:"100%", background:`linear-gradient(90deg,${C.red},#C03030)`, width:`${activeCount?(Object.keys(votesThisRd).length/activeCount)*100:0}%`, borderRadius:2 }} />
           </div>
-          <div style={{ display:"flex", gap:6 }}>
-            <Btn onClick={()=>setVotedCount(v=>Math.min(activeCount,v+1))} size="sm" variant="ghost" full>+1 Vote</Btn>
-            <Btn onClick={()=>{setPhase("voting");onToast("Voting opened on all devices","success");}} size="sm" full>Open</Btn>
-          </div>
+          <Btn onClick={toggleVoting} size="sm" full variant={votingOpen?"danger":"primary"} disabled={!started}>{votingOpen?"Close Voting":"Open Voting"}</Btn>
         </Card>
       </div>
 
+      {/* Manual vote recording — for show-of-hands / verbal votes read out at the table */}
+      <Card style={{ padding:18, marginBottom:14 }}>
+        <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>RECORD A VOTE (show of hands / verbal)</div>
+        <div style={{ display:"flex", gap:8, alignItems:"flex-end", flexWrap:"wrap", marginBottom:Object.keys(votesThisRd).length?12:0 }}>
+          <div style={{ flex:1, minWidth:200 }}>
+            <select value={voteChar} onChange={e=>setVoteChar(e.target.value)} disabled={!started} style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`, color:C.text, borderRadius:4, padding:"9px 12px", fontSize:12, fontFamily:"monospace", outline:"none" }}>
+              <option value="">Select accused...</option>
+              {scenario.characters.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <Btn onClick={recordVote} size="sm" disabled={!voteChar||!started}>+ Add Vote</Btn>
+          <Btn onClick={clearRoundVotes} size="sm" variant="ghost" disabled={!started}>Clear Round Votes</Btn>
+        </div>
+        {Object.keys(votesThisRd).length>0 && (
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+            {Object.entries(
+              Object.values(votesThisRd).reduce((acc,cid)=>{acc[cid]=(acc[cid]||0)+1;return acc;},{})
+            ).sort((a,b)=>b[1]-a[1]).map(([cid,n])=>(
+              <Badge key={cid} text={`${scenario.characters.find(c=>c.id===cid)?.name||cid} · ${n}`} color={C.red} small />
+            ))}
+          </div>
+        )}
+      </Card>
+
       {/* Clue dispatch for this round */}
       <Card style={{ padding:18, marginBottom:14 }}>
-        <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:14 }}>CLUE DISPATCH — ROUND {round}</div>
-        {roundClues.length===0
+        <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:14 }}>CLUE DISPATCH — ROUND {liveRound||"—"}</div>
+        {!started
+          ? <div style={{ fontSize:12, color:C.muted, fontStyle:"italic" }}>Start the game to begin dispatching clues.</div>
+          : roundClues.length===0
           ? <div style={{ fontSize:12, color:C.muted, fontStyle:"italic" }}>No clues configured for this round.</div>
           : (
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               {roundClues.map(c => {
                 const tc = TYPE_COLORS[c.type]||C.gold;
-                const sent = sentClues.has(c.id);
+                const sent = dispatched.includes(c.id);
                 return (
                   <div key={c.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:sent?`${tc}0A`:C.panelLt, border:`1px solid ${sent?tc+"33":C.border}`, borderRadius:6 }}>
                     <div style={{ width:3, alignSelf:"stretch", background:sent?tc:C.faint, borderRadius:2, flexShrink:0 }} />
@@ -1530,19 +1712,14 @@ function LiveControls({ scenario, onToast }) {
           )}
       </Card>
 
-      {/* Quick actions */}
+      {/* Declare winner */}
       <Card style={{ padding:18 }}>
-        <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>QUICK ACTIONS</div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8 }}>
-          {[
-            { label:"Pause All",    action:()=>{setTimerOn(false);onToast("All timers paused","success");} },
-            { label:"Full Reveal",  action:()=>onToast("Full reveal triggered on main screen","success") },
-            { label:"Send Tip",     action:()=>onToast("Anonymous tip sent to all players","success") },
-            { label:"End Session",  action:()=>onToast("Session ended — report exported","success") },
-          ].map((a,i)=>(
-            <Btn key={i} onClick={a.action} size="sm" variant="ghost" full>{a.label}</Btn>
-          ))}
+        <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:12 }}>DECLARE WINNER</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+          <Btn onClick={()=>declareWinner("civilians")} disabled={!started||ended}>Civilians Win</Btn>
+          <Btn onClick={()=>declareWinner("killer")} variant="danger" disabled={!started||ended}>Killer Wins</Btn>
         </div>
+        {ended && <div style={{ marginTop:10, fontSize:11, color:C.muted, fontFamily:"monospace" }}>Game-over screen is now live on all player devices and the big screen. Use "New Session" above to run this scenario again.</div>}
       </Card>
     </div>
   );
@@ -1824,9 +2001,11 @@ function AdminPortal() {
     const binKey = localStorage.getItem("syndicate-master-key") || "";
     const binId  = "69b1c802c3097a1dd5191e0f";
     if (binKey) {
-      const activeS = newScenarios.find(s=>s.id==="s1");
-      if (activeS) {
-        const gameState = buildGameState(activeS);
+      // Sync whichever scenario is actually live: prefer one marked "active",
+      // falling back to whatever scenario is open in the editor.
+      const liveS = newScenarios.find(s=>s.status==="active") || newScenarios.find(s=>s.id===activeScenId);
+      if (liveS) {
+        const gameState = buildGameState(liveS);
         fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
           method:"PUT",
           headers:{"Content-Type":"application/json","X-Master-Key":binKey,"X-Bin-Versioning":"false"},
@@ -1875,6 +2054,17 @@ function AdminPortal() {
     setScenarios(next);
     persist(next);
     setToast({ msg:"Saved", type:"success" });
+  }
+
+  // Characters and suspects must stay in lockstep — every character needs a
+  // suspect row (so the host can mark them eliminated) and vice versa.
+  function updateCharacters(newChars) {
+    const ids = new Set(newChars.map(c=>c.id));
+    const keptSuspects = (scenario.suspects||[]).filter(s=>ids.has(s.charId));
+    const coveredIds = new Set(keptSuspects.map(s=>s.charId));
+    const newSuspects = newChars.filter(c=>!coveredIds.has(c.id))
+      .map(c=>({ id:uid(), charId:c.id, eliminated:false, eliminatedRound:null }));
+    updateScenario({ characters:newChars, suspects:[...keptSuspects, ...newSuspects] });
   }
 
   function addScenario() {
@@ -1981,7 +2171,7 @@ function AdminPortal() {
             <RoundEditor rounds={scenario.rounds} onChange={r=>updateScenario({rounds:r})} />
           )}
           {activeNav==="characters" && scenario && (
-            <div><SectionHead title="Characters" /><CharacterEditor characters={scenario.characters} onChange={c=>updateScenario({characters:c})} /></div>
+            <div><SectionHead title="Characters" /><CharacterEditor characters={scenario.characters} onChange={updateCharacters} /></div>
           )}
           {activeNav==="clues" && scenario && (
             <div><SectionHead title="Clues & Evidence" /><ClueEditor clues={scenario.clues} characters={scenario.characters} rounds={scenario.rounds} onChange={c=>updateScenario({clues:c})} /></div>
@@ -1993,7 +2183,7 @@ function AdminPortal() {
             <PlayerAccounts players={scenario.players} characters={scenario.characters} scenario={scenario} onChange={p=>updateScenario({players:p})} />
           )}
           {activeNav==="live" && scenario && (
-            <LiveControls scenario={scenario} onToast={(m,t)=>setToast({msg:m,type:t})} />
+            <LiveControls scenario={scenario} onChange={updateScenario} onToast={(m,t)=>setToast({msg:m,type:t})} />
           )}
           {activeNav==="preview" && scenario && (
             <PreviewMode scenario={scenario} />
