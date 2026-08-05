@@ -259,6 +259,14 @@
       font-size:22px; color:var(--gold);
       letter-spacing:0.05em;
     }
+    .join-qr-box {
+      margin-top:18px;
+      display:flex; justify-content:center;
+    }
+    .join-qr-box > div {
+      background:#FFFFFF; padding:10px; border-radius:4px;
+      box-shadow:0 0 24px rgba(201,168,76,0.15);
+    }
 
     /* ── Eliminated overlay ── */
     .elim-flash {
@@ -340,6 +348,8 @@ function render() {
 
 function renderLobby(sc) {
   const base = window.location.href.replace(/\/screen\/?.*/, "");
+  const joinUrl = `${base}/join/`;
+  const qrSvg = qrMatrixToSvg(joinUrl, { size: 132 });
   sc.innerHTML = `
     <div class="header">
       <div class="header-left">
@@ -362,7 +372,11 @@ function renderLobby(sc) {
         <div class="lobby-big-premise">${G.premise}</div>
         <div class="join-url-block">
           <div class="join-url-label">Scan your invite card QR or visit</div>
-          <div class="join-url">${base}/join/</div>
+          <div class="join-url">${joinUrl}</div>
+          ${qrSvg ? `
+            <div class="join-qr-box"><div>${qrSvg}</div></div>
+            <div class="join-url-label" style="margin-top:8px;margin-bottom:0;">Then enter your game code</div>
+          ` : ""}
         </div>
       </div>
     </div>

@@ -280,3 +280,198 @@ function getClueTypeColor(type) {
   const colors = { dispatch:"#C9A84C", evidence:"#2E86C1", private:"#8E44AD", tip:"#27AE60", final:"#C0392B" };
   return colors[type] || "#7A7090";
 }
+
+// ── Pure-JS QR Code generator (no external library) ──────────────
+// Implements full QR spec: Reed-Solomon ECC, byte mode encoding,
+// finder/timing/alignment/format patterns, zigzag placement, masking.
+// Shared by the admin portal (invite cards) and the screen page (lobby
+// join QR) — kept in one place so both stay byte-for-byte identical.
+function buildQRMatrix(text) {
+  // GF(256) lookup tables
+  const EXP=new Uint8Array(512), LOG=new Uint8Array(256);
+  let gx=1;
+  for(let i=0;i<255;i++){ EXP[i]=gx; LOG[gx]=i; gx<<=1; if(gx&256)gx^=285; }
+  for(let i=255;i<512;i++) EXP[i]=EXP[i-255];
+  const gmul=(a,b)=>a&&b?EXP[LOG[a]+LOG[b]]:0;
+
+  function genpoly(n){ let p=[1]; for(let i=0;i<n;i++){ const q=[1,EXP[i]]; const r=new Array(p.length+q.length-1).fill(0); for(let a=0;a<p.length;a++) for(let b=0;b<q.length;b++) r[a+b]^=gmul(p[a],q[b]); p=r; } return p; }
+  function rsencode(data,n){ const gen=genpoly(n); const d=new Uint8Array(data.length+n); d.set(data); for(let i=0;i<data.length;i++){ const c=d[i]; if(c) for(let j=0;j<gen.length;j++) d[i+j]^=gmul(gen[j],c); } return d.slice(data.length); }
+
+  // Byte-mode data
+  const bytes=[]; for(let i=0;i<text.length;i++) bytes.push(text.charCodeAt(i)&0xFF);
+  const len=bytes.length;
+
+  // Version config (ECC level M): N=matrix size, totalDC=data codewords,
+  // ecpb=ECC codewords/block, nb1/dc1=blocks of size dc1, nb2/dc2=blocks of size dc2
+  const VCFG=[null,
+    {N:21,totalDC:16,ecpb:10,nb1:1,dc1:16,nb2:0,dc2:0},
+    {N:25,totalDC:28,ecpb:16,nb1:1,dc1:28,nb2:0,dc2:0},
+    {N:29,totalDC:44,ecpb:26,nb1:1,dc1:44,nb2:0,dc2:0},
+    {N:33,totalDC:64,ecpb:18,nb1:2,dc1:32,nb2:0,dc2:0},
+    {N:37,totalDC:86,ecpb:24,nb1:2,dc1:43,nb2:0,dc2:0},
+    {N:41,totalDC:108,ecpb:16,nb1:4,dc1:27,nb2:0,dc2:0},
+    {N:45,totalDC:124,ecpb:18,nb1:4,dc1:31,nb2:0,dc2:0},
+  ];
+  // Max data bytes per version at ECC-M
+  const CAPS=[0,6,11,22,36,50,66,81];
+  let version=1; while(version<7 && CAPS[version]<len+3) version++;
+  if(version>7) throw new Error("Text too long");
+  const cfg=VCFG[version];
+
+  // Build bit stream
+  const bits=[];
+  const pn=(v,l)=>{ for(let i=l-1;i>=0;i--) bits.push((v>>i)&1); };
+  pn(0b0100,4); pn(len,8); bytes.forEach(b=>pn(b,8));
+  for(let i=0;i<4&&bits.length<cfg.totalDC*8;i++) bits.push(0);
+  while(bits.length%8) bits.push(0);
+  const dc=[]; for(let i=0;i<bits.length;i+=8){ let b=0; for(let j=0;j<8;j++) b=(b<<1)|(bits[i+j]||0); dc.push(b); }
+  const PAD=[236,17]; let pi=0; while(dc.length<cfg.totalDC) dc.push(PAD[pi++%2]);
+
+  // Build data/ECC blocks and interleave
+  const dataBlocks=[], eccBlocks=[]; let pos=0;
+  for(let i=0;i<cfg.nb1;i++){ dataBlocks.push(dc.slice(pos,pos+cfg.dc1)); pos+=cfg.dc1; }
+  for(let i=0;i<cfg.nb2;i++){ dataBlocks.push(dc.slice(pos,pos+cfg.dc2)); pos+=cfg.dc2; }
+  dataBlocks.forEach(b=>eccBlocks.push(rsencode(new Uint8Array(b),cfg.ecpb)));
+  const final=[]; const maxDC=Math.max(cfg.dc1,cfg.dc2||0);
+  for(let i=0;i<maxDC;i++) dataBlocks.forEach(b=>{ if(i<b.length) final.push(b[i]); });
+  for(let i=0;i<cfg.ecpb;i++) eccBlocks.forEach(b=>final.push(b[i]));
+  const finalBits=[]; final.forEach(b=>{ for(let i=7;i>=0;i--) finalBits.push((b>>i)&1); });
+  const REM=[0,0,7,7,7,7,7,0]; for(let i=0;i<(REM[version]||0);i++) finalBits.push(0);
+
+  // Build matrix (null=empty, -1=reserved format, 0=light, 1=dark)
+  const SZ=cfg.N;
+  const MAT=Array.from({length:SZ},()=>new Array(SZ).fill(null));
+  const setM=(r,c,v)=>{ if(r>=0&&r<SZ&&c>=0&&c<SZ&&MAT[r][c]===null) MAT[r][c]=v; };
+  const setF=(r,c,v)=>{ if(r>=0&&r<SZ&&c>=0&&c<SZ) MAT[r][c]=v; };
+
+  // Finder pattern + separator
+  function drawFinder(tr,tc){
+    for(let r=0;r<7;r++) for(let c=0;c<7;c++)
+      setF(tr+r,tc+c,(r===0||r===6||c===0||c===6||(r>=2&&r<=4&&c>=2&&c<=4))?1:0);
+    for(let k=-1;k<=7;k++){ setM(tr+7,tc+k,0); setM(tr-1,tc+k,0); setM(tr+k,tc+7,0); setM(tr+k,tc-1,0); }
+  }
+  drawFinder(0,0); drawFinder(0,SZ-7); drawFinder(SZ-7,0);
+
+  // Timing strips
+  for(let i=8;i<SZ-8;i++){ setM(6,i,i%2===0?1:0); setM(i,6,i%2===0?1:0); }
+
+  // Dark module
+  setM(SZ-8,8,1);
+
+  // Alignment patterns
+  const APOS={2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],7:[6,22,38]};
+  // Skip a candidate center only if it genuinely overlaps a FINDER pattern's
+  // footprint — not merely "already occupied", since the timing pattern
+  // (drawn above) also occupies row/col 6, which every alignment pattern's
+  // first coordinate always equals. Alignment patterns are meant to override
+  // the timing pattern where they legitimately fall on it.
+  const FINDER_CORNERS=[[0,0],[0,SZ-7],[SZ-7,0]];
+  function overlapsFinder(r,c){
+    return FINDER_CORNERS.some(([tr,tc])=>r>=tr-1&&r<=tr+7&&c>=tc-1&&c<=tc+7);
+  }
+  if(version>=2){
+    const pts=APOS[version];
+    for(let ai=0;ai<pts.length;ai++) for(let aj=0;aj<pts.length;aj++){
+      const r=pts[ai],c=pts[aj];
+      if(overlapsFinder(r,c)) continue;
+      for(let dr=-2;dr<=2;dr++) for(let dc2=-2;dc2<=2;dc2++)
+        setF(r+dr,c+dc2,(Math.abs(dr)===2||Math.abs(dc2)===2||(dr===0&&dc2===0))?1:0);
+    }
+  }
+
+  // Reserve format info areas
+  for(let i=0;i<=8;i++){ if(MAT[8][i]===null) MAT[8][i]=-1; if(MAT[i][8]===null) MAT[i][8]=-1; }
+  for(let i=0;i<8;i++){ if(MAT[SZ-1-i][8]===null) MAT[SZ-1-i][8]=-1; if(MAT[8][SZ-1-i]===null) MAT[8][SZ-1-i]=-1; }
+
+  // Reserve version info areas (required version >= 7 — two 6x3 blocks,
+  // one left of the top-right finder, one above the bottom-left finder)
+  if(version>=7){
+    for(let i=0;i<18;i++){
+      const row=Math.floor(i/3), col=(i%3)+SZ-11;
+      setF(row,col,-1); setF(col,row,-1);
+    }
+  }
+
+  // Mask functions
+  const MASKS=[
+    (r,c)=>(r+c)%2===0,(r,c)=>r%2===0,(r,c)=>c%3===0,(r,c)=>(r+c)%3===0,
+    (r,c)=>(Math.floor(r/2)+Math.floor(c/3))%2===0,(r,c)=>(r*c)%2+(r*c)%3===0,
+    (r,c)=>((r*c)%2+(r*c)%3)%2===0,(r,c)=>((r+c)%2+(r*c)%3)%2===0,
+  ];
+
+  // Zigzag data placement (correct upward/downward direction per column pair)
+  function placeData(maskFn){
+    const tmp=MAT.map(r=>[...r]);
+    let bi=0, goUp=true, col=SZ-1;
+    while(col>=1){
+      if(col===6) col--;
+      for(let vi=0;vi<SZ;vi++){
+        const r=goUp?SZ-1-vi:vi;
+        for(let dx=0;dx<2;dx++){
+          const c=col-dx;
+          if(c<0||c>=SZ||tmp[r][c]!==null) continue;
+          const bit=bi<finalBits.length?finalBits[bi++]:0;
+          tmp[r][c]=bit^(maskFn(r,c)?1:0);
+        }
+      }
+      goUp=!goUp; col-=2;
+    }
+    return tmp;
+  }
+
+  // Penalty scoring
+  function penalty(mat){
+    let p=0;
+    for(let r=0;r<SZ;r++){ let run=1; for(let c=1;c<SZ;c++){ if(mat[r][c]===mat[r][c-1]&&mat[r][c]!==null){run++;if(run===5)p+=3;else if(run>5)p++;}else run=1; }}
+    for(let c=0;c<SZ;c++){ let run=1; for(let r=1;r<SZ;r++){ if(mat[r][c]===mat[r-1][c]&&mat[r][c]!==null){run++;if(run===5)p+=3;else if(run>5)p++;}else run=1; }}
+    for(let r=0;r<SZ-1;r++) for(let c=0;c<SZ-1;c++) if(mat[r][c]!==null&&mat[r][c]===mat[r+1][c]&&mat[r][c]===mat[r][c+1]&&mat[r][c]===mat[r+1][c+1]) p+=3;
+    return p;
+  }
+
+  let bestMat=null, bestPen=Infinity, bestMaskIdx=0;
+  for(let m=0;m<8;m++){ const mat=placeData(MASKS[m]); const pen=penalty(mat); if(pen<bestPen){bestPen=pen;bestMat=mat;bestMaskIdx=m;} }
+
+  // Format info (ECC level indicator bits: L=01, M=00, Q=11, H=10 — this
+  // generator always uses ECC level M, so the indicator is 00, not 01).
+  const fmtRaw=(0b00<<3)|bestMaskIdx;
+  let fmtRem=fmtRaw<<10;
+  const FMTPOLY=0b10100110111;
+  for(let i=14;i>=10;i--) if(fmtRem&(1<<i)) fmtRem^=FMTPOLY<<(i-10);
+  const fmtFull=((fmtRaw<<10)|(fmtRem&0x3FF))^0b101010000010010;
+  const fb=(i)=>(fmtFull>>i)&1;
+  const FC1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
+  FC1.forEach(([r,c],i)=>bestMat[r][c]=fb(14-i));
+  for(let i=0;i<7;i++) bestMat[SZ-1-i][8]=fb(i);
+  for(let i=7;i<15;i++) bestMat[8][SZ-15+i]=fb(i);
+  bestMat[SZ-8][8]=1;
+
+  // Version info (required version >= 7): 6 data bits (version number) +
+  // 12 BCH error-correction bits, written into the two reserved blocks.
+  if(version>=7){
+    let verRem=version<<12;
+    const VERPOLY=0b1111100100101; // degree-12 generator
+    for(let i=17;i>=12;i--) if(verRem&(1<<i)) verRem^=VERPOLY<<(i-12);
+    const verBits=(version<<12)|(verRem&0xFFF);
+    for(let i=0;i<18;i++){
+      const row=Math.floor(i/3), col=(i%3)+SZ-11;
+      const v=(verBits>>i)&1;
+      bestMat[row][col]=v; bestMat[col][row]=v;
+    }
+  }
+
+  return {matrix:bestMat, size:SZ};
+}
+
+// Renders a QR matrix straight to an SVG markup string — for the plain
+// vanilla-JS pages (join/play/screen) that don't have React available.
+function qrMatrixToSvg(text, { size=120, fgColor="#000000", bgColor="#FFFFFF" } = {}) {
+  let result;
+  try { result = buildQRMatrix(text); } catch(e) { return null; }
+  const { matrix, size: N } = result;
+  const cell = size / N;
+  let rects = "";
+  for (let r=0; r<N; r++) for (let c=0; c<N; c++) {
+    if (matrix[r][c] === 1) rects += `<rect x="${c*cell}" y="${r*cell}" width="${cell+0.5}" height="${cell+0.5}" fill="${fgColor}"/>`;
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><rect width="${size}" height="${size}" fill="${bgColor}"/>${rects}</svg>`;
+}
