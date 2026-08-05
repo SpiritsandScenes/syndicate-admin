@@ -458,7 +458,7 @@ async function submitCode() {
     // Mark player as joined
     foundPlayer.joined = true;
     foundPlayer.lastSeen = new Date().toISOString();
-    await SyndicateSync.write(gameState);
+    await SyndicateSync.markJoined(foundPlayer.code);
     renderCharacterReveal(foundPlayer, gameState);
   } catch(e) {
     renderCodeEntry(code, "Connection error. Please try again.");
@@ -489,7 +489,7 @@ async function init() {
       if (foundPlayer) {
         foundPlayer.joined = true;
         foundPlayer.lastSeen = new Date().toISOString();
-        await SyndicateSync.write(gameState);
+        await SyndicateSync.markJoined(foundPlayer.code);
         renderCharacterReveal(foundPlayer, gameState);
       } else {
         renderCodeEntry(urlCode, `Code "${urlCode.toUpperCase()}" not recognised. Check your invite card.`);

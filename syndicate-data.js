@@ -19,6 +19,18 @@ const JSONBIN_ID       = "69b1c802c3097a1dd5191e0f";
 const JSONBIN_READ_KEY = "$2a$10$yL93zx9EFukLZzNy5w2Vz.TsyLYHJlzrPq/CAoux8bGzZCRN3xKyO";
 const JSONBIN_URL      = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
 
+// ── Player write key ─────────────────────────────────────────────
+// A JSONbin Access Key scoped to Read + Update only (NOT Delete, NOT
+// scoped to other bins). This lets player devices (join/play pages)
+// persist their own join status and votes to the shared bin without
+// ever holding the full admin Master Key. Safe to keep public — the
+// worst a holder of this key can do is overwrite bin contents, never
+// delete the bin or read/write other bins on the account.
+//
+// Create it in the JSONbin dashboard: Access Keys → New Key → grant
+// this bin's Find + Update permissions only → paste the value below.
+const JSONBIN_PLAYER_KEY = "PASTE_YOUR_PLAYER_UPDATE_KEY_HERE";
+
 // ── Poll interval for player apps (ms) ──────────────────────────
 const POLL_INTERVAL = 4000; // 4 seconds
 
@@ -99,6 +111,9 @@ const SyndicateSync = {
   // True if the read-only key has been filled in
   readConfigured: () => JSONBIN_READ_KEY !== "PASTE_YOUR_READ_ONLY_ACCESS_KEY_HERE",
 
+  // True if the scoped player (read+update) key has been filled in
+  playerKeyConfigured: () => JSONBIN_PLAYER_KEY !== "PASTE_YOUR_PLAYER_UPDATE_KEY_HERE",
+
   // Retrieve write key from admin localStorage only (never from this file)
   getWriteKey: () => {
     try { return localStorage.getItem("syndicate-master-key") || ""; } catch { return ""; }
@@ -108,7 +123,7 @@ const SyndicateSync = {
     return this.readConfigured() && this.getWriteKey().length > 10;
   },
 
-  // ── READ (uses safe public read-only key) ──────────────────────
+  // ── READ (uses safe public read-only key, falls back to cache) ──
   async read() {
     if (!this.readConfigured()) {
       try {
@@ -116,35 +131,43 @@ const SyndicateSync = {
         return raw ? JSON.parse(raw) : { ...SEED_STATE };
       } catch { return { ...SEED_STATE }; }
     }
+    const record = await this.tryReadRemote();
+    if (record) {
+      try { localStorage.setItem("syndicate-gamestate", JSON.stringify(record)); } catch {}
+      return record;
+    }
+    console.warn("JSONbin read failed, using localStorage");
+    try {
+      const raw = localStorage.getItem("syndicate-gamestate");
+      return raw ? JSON.parse(raw) : { ...SEED_STATE };
+    } catch { return { ...SEED_STATE }; }
+  },
+
+  // ── READ, no fallback — returns null on any failure. Use this when
+  //    silently substituting seed/cached data would be actively wrong
+  //    (e.g. the admin portal deciding whether real progress exists). ──
+  async tryReadRemote() {
+    if (!this.readConfigured()) return null;
     try {
       const res = await fetch(`${JSONBIN_URL}/latest`, {
         headers: { "X-Access-Key": JSONBIN_READ_KEY }
       });
-      if (!res.ok) throw new Error("read failed " + res.status);
+      if (!res.ok) return null;
       const json = await res.json();
-      // Cache locally as fallback
-      try { localStorage.setItem("syndicate-gamestate", JSON.stringify(json.record)); } catch {}
-      return json.record;
-    } catch(e) {
-      console.warn("JSONbin read failed, using localStorage:", e.message);
-      try {
-        const raw = localStorage.getItem("syndicate-gamestate");
-        return raw ? JSON.parse(raw) : { ...SEED_STATE };
-      } catch { return { ...SEED_STATE }; }
-    }
+      return json.record || null;
+    } catch { return null; }
   },
 
-  // ── WRITE (uses master key from admin localStorage only) ────────
+  // ── WRITE (uses master key from admin localStorage only) ─────────
+  //    Full-state overwrite. Only the admin portal should call this —
+  //    it has no merge logic, so it will stomp on concurrent changes.
   async write(state) {
     // Always cache locally
     try { localStorage.setItem("syndicate-gamestate", JSON.stringify(state)); } catch {}
 
     const writeKey = this.getWriteKey();
-    if (!writeKey) {
-      // No write key available — silently succeed for player-side
-      // actions (vote casting stores locally; admin will overwrite)
-      return true;
-    }
+    if (!writeKey) return true; // no admin key on this device — local cache only
+
     try {
       const res = await fetch(JSONBIN_URL, {
         method: "PUT",
@@ -162,12 +185,67 @@ const SyndicateSync = {
     }
   },
 
+  // ── PLAYER-SIDE MUTATIONS ─────────────────────────────────────────
+  //    Player devices never hold the Master Key. Instead these re-fetch
+  //    the latest remote record (shrinking the window for two players'
+  //    writes to race each other), apply a small mutation, and PUT with
+  //    the scoped player key (X-Access-Key, Update permission only).
+  async _mutateRemote(mutator) {
+    let state = (await this.tryReadRemote()) || (await this.read());
+    state = mutator(state) || state;
+    try { localStorage.setItem("syndicate-gamestate", JSON.stringify(state)); } catch {}
+
+    if (!this.playerKeyConfigured()) {
+      console.warn("JSONBIN_PLAYER_KEY not configured — change is cached locally only and will not reach other devices.");
+      return true;
+    }
+    try {
+      const res = await fetch(JSONBIN_URL, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Access-Key": JSONBIN_PLAYER_KEY,
+          "X-Bin-Versioning": "false"
+        },
+        body: JSON.stringify(state)
+      });
+      return res.ok;
+    } catch(e) {
+      console.warn("Player write failed:", e.message);
+      return false;
+    }
+  },
+
+  // Marks a player joined (by their game code) in the shared state.
+  async markJoined(code) {
+    return this._mutateRemote(state => {
+      const p = getPlayerByCode(state, code);
+      if (p) { p.joined = true; p.lastSeen = new Date().toISOString(); }
+      return state;
+    });
+  },
+
+  // Records one player's vote for the current round in the shared state.
+  async submitVote(code, round, charId) {
+    return this._mutateRemote(state => {
+      const p = getPlayerByCode(state, code);
+      if (!p) return state;
+      if (!state.votes) state.votes = {};
+      if (!state.votes[round]) state.votes[round] = {};
+      state.votes[round][p.id] = charId;
+      return state;
+    });
+  },
+
   // ── POLL (read-only, safe for all pages) ───────────────────────
   poll(callback, interval = POLL_INTERVAL) {
     let lastHash = "";
     const tick = async () => {
       const state = await this.read();
-      const hash = state.currentRound + "_" + (state.dispatchedClues||[]).length + "_" + (state.votingOpen?"1":"0") + "_" + (state.eliminatedChars||[]).length;
+      // Hash the whole record — a partial field list (round/clues/voting/
+      // eliminated) previously missed gamePhase/winner, so the Round 5
+      // game-over reveal could go out with nothing to trigger a re-render.
+      const hash = JSON.stringify(state);
       if (hash !== lastHash) {
         lastHash = hash;
         callback(state);

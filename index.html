@@ -31,6 +31,9 @@
   <!-- Babel Standalone for JSX transpilation in-browser -->
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 
+  <!-- Shared game data module — sync engine, seed data, helpers -->
+  <script src="syndicate-data.js"></script>
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { width: 100%; height: 100%; min-height: 100vh; }
@@ -225,19 +228,19 @@ const SEED_SCENARIOS = [
       { id:"su3", charId:"c3", eliminated:false, eliminatedRound:null },
       { id:"su4", charId:"c4", eliminated:false, eliminatedRound:null },
       { id:"su5", charId:"c5", eliminated:false, eliminatedRound:null },
-      { id:"su6", charId:"c6", eliminated:true,  eliminatedRound:3 },
-      { id:"su7", charId:"c7", eliminated:true,  eliminatedRound:2 },
+      { id:"su6", charId:"c6", eliminated:false, eliminatedRound:null },
+      { id:"su7", charId:"c7", eliminated:false, eliminatedRound:null },
       { id:"su8", charId:"c8", eliminated:false, eliminatedRound:null },
       { id:"su9", charId:"c9", eliminated:false, eliminatedRound:null },
       { id:"su10",charId:"c10",eliminated:false, eliminatedRound:null },
     ],
     players: [
-      { id:"p1", name:"Sarah Chen",      code:"MALT-7842", character:"c4", joined:true,  lastSeen:"2 min ago" },
-      { id:"p2", name:"James Whitmore",  code:"RYES-3319", character:"c7", joined:true,  lastSeen:"4 min ago" },
-      { id:"p3", name:"Priya Nair",      code:"CORN-5561", character:"c6", joined:true,  lastSeen:"1 min ago" },
-      { id:"p4", name:"Marcus Webb",     code:"MASH-9274", character:"c1", joined:true,  lastSeen:"6 min ago" },
-      { id:"p5", name:"Elena Sousa",     code:"STILL-1138",character:"c3", joined:false, lastSeen:"Never" },
-      { id:"p6", name:"Tom Alcott",      code:"CASK-4420", character:"c8", joined:true,  lastSeen:"3 min ago" },
+      { id:"p1", name:"Sarah Chen",      code:"MALT-7842", character:"c4", joined:false, lastSeen:null },
+      { id:"p2", name:"James Whitmore",  code:"RYES-3319", character:"c7", joined:false, lastSeen:null },
+      { id:"p3", name:"Priya Nair",      code:"CORN-5561", character:"c6", joined:false, lastSeen:null },
+      { id:"p4", name:"Marcus Webb",     code:"MASH-9274", character:"c1", joined:false, lastSeen:null },
+      { id:"p5", name:"Elena Sousa",     code:"STILL-1138",character:"c3", joined:false, lastSeen:null },
+      { id:"p6", name:"Tom Alcott",      code:"CASK-4420", character:"c8", joined:false, lastSeen:null },
     ],
   },
   {
@@ -349,7 +352,7 @@ function Btn({ children, onClick, variant="primary", size="md", disabled=false, 
   );
 }
 
-function Input({ value, onChange, placeholder, multiline=false, rows=3, label, hint }) {
+function Input({ value, onChange, placeholder, multiline=false, rows=3, label, hint, type="text" }) {
   const shared = {
     width:"100%", background:C.bg, border:`1px solid ${C.border}`,
     borderRadius:4, padding:"9px 12px", color:C.text,
@@ -362,7 +365,7 @@ function Input({ value, onChange, placeholder, multiline=false, rows=3, label, h
       {label && <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2, marginBottom:5 }}>{label.toUpperCase()}</div>}
       {multiline
         ? <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={shared} />
-        : <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={shared} />
+        : <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={shared} />
       }
       {hint && <div style={{ fontSize:10, color:C.muted, marginTop:4 }}>{hint}</div>}
     </div>
@@ -472,7 +475,7 @@ function LoginScreen({ onLogin }) {
             AUTHORISED PERSONNEL ONLY
           </div>
           <Input label="Email" value={email} onChange={setEmail} placeholder="admin@thesyndicate.game" />
-          <Input label="Password" value={password} onChange={setPassword} placeholder="••••••••••" />
+          <Input label="Password" value={password} onChange={setPassword} placeholder="••••••••••" type="password" />
           {error && <div style={{ fontSize:11, color:C.red, fontFamily:"monospace", marginBottom:14, textAlign:"center" }}>{error}</div>}
           <Btn onClick={handleLogin} disabled={loading} full size="lg">
             {loading ? "AUTHENTICATING..." : "ENTER THE PORTAL"}
@@ -1549,7 +1552,10 @@ function LiveControls({ scenario, onChange, onToast }) {
   const timerCol    = timer<60?C.red:timer<120?C.amber:C.cream;
 
   function startGame() {
-    onChange({ liveRound:1, gamePhase:"round", votingOpen:false, winner:null, dispatchedClues:[], votes:{} });
+    onChange({
+      liveRound:1, gamePhase:"round", votingOpen:false, winner:null, dispatchedClues:[], votes:{},
+      suspects: scenario.suspects.map(s=>({...s, eliminated:false, eliminatedRound:null})),
+    });
     onToast("Game started — Round 1 is now live on all devices", "success");
   }
   function goToRound(r) {
@@ -1959,6 +1965,67 @@ function StoryEditor({ scenario, onChange }) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// LIVE-STATE HYDRATION
+// The admin portal is the only editor for scenario content (story,
+// characters, clues, rounds) — that always stays local/edited-here.
+// But *live* fields (round, phase, voting, dispatched clues, votes,
+// who's eliminated, who's joined) are also written by the join/play
+// pages straight to JSONbin. Without pulling those back in, a fresh
+// tab or a second device only has the local seed and will stomp real
+// progress on its very next write. This merges the remote live fields
+// into the matching scenario without touching editorial content.
+// ══════════════════════════════════════════════════════════════════
+// Full hydrate — safe only when local state is otherwise unknown (first
+// mount / fresh device). Pulls in every live field, admin-owned or not.
+function hydrateLiveState(scenarios, remote) {
+  if (!remote || !remote.scenarioId) return scenarios;
+  return scenarios.map(s => {
+    if (s.id !== remote.scenarioId) return s;
+    const eliminatedIds = new Set(remote.eliminatedChars || []);
+    const suspects = (s.suspects||[]).map(su => ({
+      ...su,
+      eliminated: eliminatedIds.has(su.charId),
+    }));
+    return {
+      ...s,
+      liveRound:       remote.currentRound   ?? s.liveRound,
+      gamePhase:       remote.gamePhase      ?? s.gamePhase,
+      votingOpen:      !!remote.votingOpen,
+      winner:          remote.winner         ?? s.winner ?? null,
+      dispatchedClues: remote.dispatchedClues || s.dispatchedClues || [],
+      votes:           remote.votes          || s.votes || {},
+      suspects,
+      players:         mergePlayerActivity(s.players, remote.players),
+    };
+  });
+}
+
+// Partial hydrate — safe to poll continuously. Only merges fields that
+// ONLY player devices ever write (joined status, votes). Never touches
+// round/phase/voting/dispatchedClues/eliminations — those are admin-owned,
+// and a stale remote read landing right after the host's own action must
+// never be allowed to revert it.
+function hydratePlayerActivity(scenarios, remote) {
+  if (!remote || !remote.scenarioId) return scenarios;
+  return scenarios.map(s => {
+    if (s.id !== remote.scenarioId) return s;
+    return {
+      ...s,
+      votes:   remote.votes || s.votes || {},
+      players: mergePlayerActivity(s.players, remote.players),
+    };
+  });
+}
+
+function mergePlayerActivity(players, remotePlayers) {
+  const remoteByCode = new Map((remotePlayers||[]).map(p => [p.code, p]));
+  return (players||[]).map(p => {
+    const rp = remoteByCode.get(p.code);
+    return rp ? { ...p, joined: !!rp.joined, lastSeen: rp.lastSeen ?? p.lastSeen } : p;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
 // MAIN ADMIN APP
 // ══════════════════════════════════════════════════════════════════
 const NAV = [
@@ -2041,13 +2108,31 @@ function AdminPortal() {
     };
   }
 
-  // Load from storage on mount
+  // Load from storage on mount, then pull real live progress from JSONbin.
+  // tryReadRemote() returns null on any failure (no seed fallback) — a
+  // network hiccup must never look like "the bin says nothing is live".
   useEffect(() => {
     try {
       const saved = localStorage.getItem("syndicate-scenarios");
       if (saved) setScenarios(JSON.parse(saved));
     } catch(e) {}
+    (async () => {
+      const remote = await SyndicateSync.tryReadRemote();
+      if (remote) setScenarios(prev => hydrateLiveState(prev, remote));
+    })();
   }, []);
+
+  // While watching the Live tab, keep pulling real join/vote progress —
+  // otherwise the host would only ever see the manual/local vote count,
+  // never what players actually cast from their own phones.
+  useEffect(() => {
+    if (activeNav !== "live") return;
+    const timer = setInterval(async () => {
+      const remote = await SyndicateSync.tryReadRemote();
+      if (remote) setScenarios(prev => hydratePlayerActivity(prev, remote));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [activeNav]);
 
   function updateScenario(updates) {
     const next = scenarios.map(s => s.id===activeScenId ? {...s,...updates,lastEdited:new Date().toISOString().slice(0,10)} : s);

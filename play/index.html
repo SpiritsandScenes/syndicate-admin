@@ -485,7 +485,8 @@ let G        = null;  // game state
 let PLAYER   = null;  // current player
 let CHAR     = null;  // current character
 let activeTab= "clues";
-let myVotes  = {};    // { roundNumber: charId }
+let myVotes     = {};    // { roundNumber: charId } — CONFIRMED, submitted votes only
+let mySelection = {};    // { roundNumber: charId } — tentative pick, not yet submitted
 let pollTimer= null;
 let prevDispatchCount = 0;
 let isOnline = true;
@@ -731,7 +732,7 @@ function renderVote(el) {
     .map(([id, c]) => ({ id, ...c, isEliminated: eliminated.includes(id) }))
     .sort((a,b) => a.name.localeCompare(b.name));
 
-  const selectedId = myVotes[round] || null;
+  const selectedId = alreadyVoted || mySelection[round] || null;
 
   el.innerHTML = `
     <div class="voting-prompt">
@@ -772,19 +773,20 @@ function renderVote(el) {
 
 function selectVote(charId) {
   const round = G.currentRound;
-  myVotes[round] = charId;
+  mySelection[round] = charId;
   renderVote(document.getElementById("tab-content"));
 }
 
 async function submitVote() {
   const round = G.currentRound;
-  const charId = myVotes[round];
+  const charId = mySelection[round];
   if (!charId) return;
-  // Write vote to game state
+  // Only now — on explicit submit, not on mere selection — is the vote confirmed.
+  myVotes[round] = charId;
   if (!G.votes) G.votes = {};
   if (!G.votes[round]) G.votes[round] = {};
   G.votes[round][PLAYER.id] = charId;
-  await SyndicateSync.write(G);
+  await SyndicateSync.submitVote(PLAYER.code, round, charId);
   showToast("Vote submitted");
   renderVote(document.getElementById("tab-content"));
 }
