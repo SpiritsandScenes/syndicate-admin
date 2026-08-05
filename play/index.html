@@ -480,7 +480,12 @@
 <script>
 // ── State ──────────────────────────────────────────────────────
 const params = new URLSearchParams(window.location.search);
-const CODE   = params.get("code") || "";
+// Fall back to the last verified code if the URL doesn't have one (e.g. a
+// bookmarked bare URL, or a browser tab restore that drops the query string)
+// so a refresh doesn't bounce the player back to re-entering their code.
+let savedCode = "";
+try { savedCode = localStorage.getItem("syndicate-my-code") || ""; } catch {}
+const CODE = params.get("code") || savedCode;
 let G        = null;  // game state
 let PLAYER   = null;  // current player
 let CHAR     = null;  // current character
@@ -507,6 +512,7 @@ async function init() {
   }
   CHAR = G.characters[PLAYER.character];
   prevDispatchCount = G.dispatchedClues.length;
+  try { localStorage.setItem("syndicate-my-code", CODE); } catch {}
   render();
   // Start polling
   pollTimer = SyndicateSync.poll(onStateUpdate, 4000);

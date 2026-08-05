@@ -2046,7 +2046,9 @@ const NAV = [
 ];
 
 function AdminPortal() {
-  const [loggedIn, setLoggedIn]     = useState(false);
+  // Persisted so a refresh (or the host's browser restarting at the venue)
+  // doesn't force logging back in with the shared demo credentials every time.
+  const [loggedIn, setLoggedIn]     = useState(() => localStorage.getItem("syndicate-logged-in") === "1");
   const [scenarios, setScenarios]   = useState(SEED_SCENARIOS);
   const [activeScenId, setActiveScenId] = useState("s1");
   const [activeNav, setActiveNav]   = useState("scenarios");
@@ -2135,7 +2137,7 @@ function AdminPortal() {
   // otherwise the host would only ever see the manual/local vote count,
   // never what players actually cast from their own phones.
   useEffect(() => {
-    if (activeNav !== "live") return;
+    if (activeNav !== "live" && activeNav !== "players") return;
     const timer = setInterval(async () => {
       const remote = await SyndicateSync.tryReadRemote();
       if (remote) setScenarios(prev => hydratePlayerActivity(prev, remote));
@@ -2181,7 +2183,7 @@ function AdminPortal() {
     if (activeScenId===id) setActiveScenId(next[0]?.id||null);
   }
 
-  if (!loggedIn) return <LoginScreen onLogin={()=>setLoggedIn(true)} />;
+  if (!loggedIn) return <LoginScreen onLogin={()=>{ localStorage.setItem("syndicate-logged-in","1"); setLoggedIn(true); }} />;
 
   const scenarioSections = ["story","rounds","characters","clues","suspects","players","live","preview"];
   const showScenarioBar = scenarioSections.includes(activeNav) && scenario;
@@ -2246,7 +2248,7 @@ function AdminPortal() {
           </div>
           <Btn onClick={()=>setShowKeyBanner(true)} size="sm" variant="ghost" full>{hasWriteKey?"Change Sync Key":"⚠ Set Sync Key"}</Btn>
           <div style={{ height:6 }} />
-          <Btn onClick={()=>setLoggedIn(false)} size="sm" variant="ghost" full>Sign Out</Btn>
+          <Btn onClick={()=>{ localStorage.removeItem("syndicate-logged-in"); setLoggedIn(false); }} size="sm" variant="ghost" full>Sign Out</Btn>
         </div>
       </div>
 

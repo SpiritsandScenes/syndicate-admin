@@ -459,6 +459,7 @@ async function submitCode() {
     foundPlayer.joined = true;
     foundPlayer.lastSeen = new Date().toISOString();
     await SyndicateSync.markJoined(foundPlayer.code);
+    try { localStorage.setItem("syndicate-my-code", foundPlayer.code); } catch {}
     renderCharacterReveal(foundPlayer, gameState);
   } catch(e) {
     renderCodeEntry(code, "Connection error. Please try again.");
@@ -474,8 +475,16 @@ function enterGame(code) {
 
 // ── Init ───────────────────────────────────────────────────────
 async function init() {
-  if (urlCode) {
-    // Code came from QR scan — auto-submit
+  // Prefer the code from the URL (QR scan). If it's missing — the code
+  // was typed in manually rather than scanned, so nothing ever put it in
+  // the address bar — fall back to the last code this browser verified,
+  // so a refresh or reopened tab doesn't force a retype.
+  let code = urlCode;
+  if (!code) {
+    try { code = localStorage.getItem("syndicate-my-code") || ""; } catch { code = ""; }
+  }
+
+  if (code) {
     document.getElementById("app-content").innerHTML = `
       <div style="text-align:center;color:var(--muted);font-size:11px;letter-spacing:0.2em;">
         <div class="spinner" style="margin:0 auto 16px;"></div>
@@ -485,18 +494,19 @@ async function init() {
     // small delay for UX
     setTimeout(async () => {
       gameState = await SyndicateSync.read();
-      foundPlayer = getPlayerByCode(gameState, urlCode);
+      foundPlayer = getPlayerByCode(gameState, code);
       if (foundPlayer) {
         foundPlayer.joined = true;
         foundPlayer.lastSeen = new Date().toISOString();
         await SyndicateSync.markJoined(foundPlayer.code);
+        try { localStorage.setItem("syndicate-my-code", foundPlayer.code); } catch {}
         renderCharacterReveal(foundPlayer, gameState);
       } else {
-        renderCodeEntry(urlCode, `Code "${urlCode.toUpperCase()}" not recognised. Check your invite card.`);
+        renderCodeEntry(code, `Code "${code.toUpperCase()}" not recognised. Check your invite card.`);
       }
     }, 600);
   } else {
-    // No code — show entry form
+    // No code anywhere — show entry form
     renderCodeEntry();
   }
 }
