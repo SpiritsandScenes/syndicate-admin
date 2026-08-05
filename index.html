@@ -1597,6 +1597,11 @@ function LiveControls({ scenario, onChange, onToast }) {
     onChange({
       liveRound:0, gamePhase:"lobby", votingOpen:false, winner:null, dispatchedClues:[], votes:{},
       suspects: scenario.suspects.map(s=>({...s, eliminated:false, eliminatedRound:null})),
+      // Clear join status too — "New Session" means a fresh run for a new
+      // group of players, so anyone marked joined from a prior run/test
+      // (including the fake seed data older deploys shipped with) must
+      // not carry over and show as falsely online.
+      players: scenario.players.map(p=>({...p, joined:false, lastSeen:null})),
     });
     onToast("Session reset — ready to run again", "success");
   }
@@ -2050,11 +2055,15 @@ function AdminPortal() {
   const [showKeyBanner, setShowKeyBanner] = useState(
     !localStorage.getItem("syndicate-master-key")
   );
+  const [hasWriteKey, setHasWriteKey] = useState(
+    !!localStorage.getItem("syndicate-master-key")
+  );
 
   function saveWriteKey(key) {
     if (!key || key.length < 20) return;
     localStorage.setItem("syndicate-master-key", key.trim());
     setShowKeyBanner(false);
+    setHasWriteKey(true);
   }
 
   const scenario = scenarios.find(s=>s.id===activeScenId);
@@ -2229,6 +2238,14 @@ function AdminPortal() {
         <div style={{ padding:"14px 18px", borderTop:`1px solid ${C.border}` }}>
           <div style={{ fontSize:10, color:C.cream, marginBottom:2 }}>Admin</div>
           <div style={{ fontSize:9, color:C.muted, fontFamily:"monospace", marginBottom:10 }}>admin@thesyndicate.game</div>
+          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10 }}>
+            <div style={{ width:6, height:6, borderRadius:"50%", background: hasWriteKey?C.green:C.red, flexShrink:0 }} />
+            <div style={{ fontSize:8, color:hasWriteKey?C.muted:C.red, fontFamily:"monospace", letterSpacing:0.5 }}>
+              {hasWriteKey ? "Sync key saved" : "No sync key — writes are local only"}
+            </div>
+          </div>
+          <Btn onClick={()=>setShowKeyBanner(true)} size="sm" variant="ghost" full>{hasWriteKey?"Change Sync Key":"⚠ Set Sync Key"}</Btn>
+          <div style={{ height:6 }} />
           <Btn onClick={()=>setLoggedIn(false)} size="sm" variant="ghost" full>Sign Out</Btn>
         </div>
       </div>
