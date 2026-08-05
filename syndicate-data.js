@@ -29,7 +29,7 @@ const JSONBIN_URL      = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
 //
 // Create it in the JSONbin dashboard: Access Keys → New Key → grant
 // this bin's Find + Update permissions only → paste the value below.
-const JSONBIN_PLAYER_KEY = "PASTE_YOUR_PLAYER_UPDATE_KEY_HERE";
+const JSONBIN_PLAYER_KEY = "$2a$10$QTGGTLCqNZE0pExx./YqgugqxH/4ljZifQc3H/t8N.nzKcj3mNfNK";
 
 // ── Poll interval for player apps (ms) ──────────────────────────
 const POLL_INTERVAL = 4000; // 4 seconds
