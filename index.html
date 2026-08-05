@@ -2138,11 +2138,14 @@ function AdminPortal() {
   // never what players actually cast from their own phones.
   useEffect(() => {
     if (activeNav !== "live" && activeNav !== "players") return;
-    const timer = setInterval(async () => {
+    let cancelled = false;
+    const tick = async () => {
       const remote = await SyndicateSync.tryReadRemote();
-      if (remote) setScenarios(prev => hydratePlayerActivity(prev, remote));
-    }, 5000);
-    return () => clearInterval(timer);
+      if (!cancelled && remote) setScenarios(prev => hydratePlayerActivity(prev, remote));
+    };
+    tick(); // don't make the host wait a full interval to see who's already joined
+    const timer = setInterval(tick, 5000);
+    return () => { cancelled = true; clearInterval(timer); };
   }, [activeNav]);
 
   function updateScenario(updates) {
