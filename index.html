@@ -1977,6 +1977,31 @@ function mergePlayerActivity(players, remotePlayers) {
   });
 }
 
+// A host's browser caches the full scenario (content included) in
+// localStorage, so it survives reloads without a network round trip. That
+// means whenever a code update adds a brand-new content field (like the
+// interrogation question bank), anyone with an existing cache never picks
+// it up — the stale cached copy has no such field, and it always wins over
+// SEED_SCENARIOS on mount. This backfills ONLY fields that are missing
+// entirely, using the fresh seed as the source, so host edits to existing
+// fields (story text, character bios, added extra guests, etc.) are never
+// touched or reverted.
+function backfillMissingContent(scenarios) {
+  return scenarios.map(s => {
+    const seedMatch = SEED_SCENARIOS.find(seed => seed.id === s.id);
+    if (!seedMatch) return s;
+    return {
+      ...s,
+      questionBank: (s.questionBank && s.questionBank.length) ? s.questionBank : seedMatch.questionBank,
+      characters: (s.characters||[]).map(c => {
+        if (c.answers && Object.keys(c.answers).length) return c;
+        const seedChar = (seedMatch.characters||[]).find(sc => sc.id === c.id);
+        return seedChar?.answers ? { ...c, answers: seedChar.answers } : c;
+      }),
+    };
+  });
+}
+
 // ══════════════════════════════════════════════════════════════════
 // MAIN ADMIN APP
 // ══════════════════════════════════════════════════════════════════
@@ -2074,7 +2099,15 @@ function AdminPortal() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("syndicate-scenarios");
-      if (saved) setScenarios(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const backfilled = backfillMissingContent(parsed);
+        setScenarios(backfilled);
+        // If the cache predated a content field (e.g. the interrogation
+        // question bank), push the corrected state immediately — otherwise
+        // it silently waits for the host's next unrelated edit.
+        if (JSON.stringify(backfilled) !== JSON.stringify(parsed)) persist(backfilled);
+      }
     } catch(e) {}
     (async () => {
       const remote = await SyndicateSync.tryReadRemote();
