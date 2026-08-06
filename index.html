@@ -175,6 +175,10 @@ const SEED_SCENARIOS = [
       hostOpeningScript: "Welcome to The Gilded Barrel. Tonight you are all trusted members of the Marchetti Syndicate. Earlier this evening, Angelo Marchetti was found dead in Barrel Room Number Seven. Poisoned. His personal flask. The Don has sealed the building. Nobody leaves. The killer is in this room. You have five rounds to find them.",
       winCondition: "Civilians win by voting out the Killer at any point during Rounds 1-5. The Killer wins by surviving all five rounds without being eliminated.",
     },
+    // Same 10 interrogation questions/answers used by the play page —
+    // defined once in syndicate-data.js (QUESTION_BANK / SEED_STATE) and
+    // referenced here rather than re-typed, so admin and player never drift.
+    questionBank: QUESTION_BANK,
     rounds: [
       { id:"r1", round:1, title:"The Gathering",        timing:"0:00–0:22", notes:"Trimmed to 22 min — 6 players x 3-4 min speaking. Cut from 35 min to eliminate dead air after ~22 min." },
       { id:"r2", round:2, title:"The Evidence",         timing:"0:35–0:55", notes:"20 min. Toxicology + stopped watch + new private clues for Tommy and Moreau increase table discussion." },
@@ -182,17 +186,20 @@ const SEED_SCENARIOS = [
       { id:"r4", round:4, title:"The Final Clues",      timing:"1:40–2:00", notes:"20 min. Handkerchief + tip + Rosa Consigliere reveal mechanic adds 5-8 min of structured drama." },
       { id:"r5", round:5, title:"The Final Accusation", timing:"2:05–2:30", notes:"25 min — extended from 12. Serafina and Frankie share final clues publicly. Dom defends. Full table debate then vote." },
     ],
+    // answers: referenced from syndicate-data.js's SEED_STATE rather than
+    // re-typed here, so the 10 interrogation answers per character live in
+    // exactly one place.
     characters: [
-      { id:"c1", name:"Dominic Caruso",     avatar:"DC", role:"KILLER",      roleColor:C.red,   position:"Head of Finances",  alibi:"At the bar 10:00–10:20 PM. Barman confirms — imprecisely.", objective:"Survive all 5 rounds. In Round 2, you may state as fact: Aldo Benedetti threatened Angelo two weeks ago. I heard it myself. Redirect all suspicion to Aldo and away from the ledger.", secret:"Embezzled $41,200 via Blue Flamingo. Poisoned flask at 9:38 PM." },
-      { id:"c2", name:"Rosa Vitale",        avatar:"RV", role:"CONSIGLIERE", roleColor:C.amber, position:"Angelo's Secretary", alibi:"Clearing the dining room 9:30–10:15 PM. Staff can confirm.", objective:"Protect Dom. Misdirect. In Round 4 you must stand and announce: I know something about one person at this table. Then whisper your accusation to the host who confirms the role privately to you. Use it to protect Dom.", secret:"Complicit in the embezzlement. Warned Dom about the ledger." },
-      { id:"c3", name:"Frankie Malone",     avatar:"FM", role:"LOOKOUT",     roleColor:C.blue,  position:"Driver / Enforcer", alibi:"Back corridor near cellar stairs 10:00–10:30 PM.", objective:"Stay quiet. Drop hints. Name Dom only if eliminated.", secret:"Saw Dom exit the barrel room at 10:15 PM." },
-      { id:"c4", name:"Serafina Marchetti", avatar:"SM", role:"CIVILIAN",    roleColor:C.green, position:"Angelo's Sister",   alibi:"Angelo's side during toasts, then powder room 10:00 PM.", objective:"Find your brother's killer. Watch who smiles in grief.", secret:"Angelo warned you: 'The man who smiles most in a room of grief.'" },
-      { id:"c5", name:"Father Nico Avelli", avatar:"NA", role:"CIVILIAN",    roleColor:C.green, position:"Family Confessor",  alibi:"Vestibule greeting guests until 9:45 PM. Multiple witnesses.", objective:"Maintain neutrality. You heard Angelo's confession 3 wks ago.", secret:"Angelo confessed fear of betrayal — did not name the person." },
-      { id:"c6", name:"Lena Kowalski",      avatar:"LK", role:"CIVILIAN",    roleColor:C.green, position:"Jazz Singer",       alibi:"On stage 9:00–9:55 PM. Entire room witnessed.", objective:"Protect your own reputation. Angelo owed you money.", secret:"Angelo and you were having an affair. Rosa knew." },
-      { id:"c7", name:"Aldo Benedetti",     avatar:"AB", role:"CIVILIAN",    roleColor:C.green, position:"Rival Bootlegger",  alibi:"Arrived late — 10:05 PM. Car park attendant confirms.", objective:"You are the obvious suspect. Use it strategically.", secret:"You came to confront Angelo about a stolen shipment — not to kill him." },
-      { id:"c8", name:"Tommy Ricci",        avatar:"TR", role:"CIVILIAN",    roleColor:C.green, position:"Debt Collector",    alibi:"Coat room 9:45–10:10 PM. Attendant can confirm.", objective:"Collect what Angelo owed. You have invoice copies.", secret:"Audited Blue Flamingo. Noticed discrepancies but said nothing." },
-      { id:"c9", name:"Celeste Monroe",     avatar:"CM", role:"CIVILIAN",    roleColor:C.green, position:"Society Journalist",alibi:"Interviewing guests openly all evening. Notebook as proof.", objective:"Get the story. You were blackmailing Angelo over his affair.", secret:"You know about Lena. Angelo paid you to stay quiet — until last week." },
-      { id:"c10",name:"Inspector Moreau",   avatar:"VM", role:"CIVILIAN",    roleColor:C.green, position:"Corrupt Detective", alibi:"Examining the barrel room from 10:22 PM. Official capacity.", objective:"Bungle the investigation. You're on the Syndicate's payroll.", secret:"Marchetti pays your mortgage. You will not find this killer." },
+      { id:"c1", name:"Dominic Caruso",     avatar:"DC", role:"KILLER",      roleColor:C.red,   position:"Head of Finances",  alibi:"At the bar 10:00–10:20 PM. Barman confirms — imprecisely.", objective:"Survive all 5 rounds. In Round 2, you may state as fact: Aldo Benedetti threatened Angelo two weeks ago. I heard it myself. Redirect all suspicion to Aldo and away from the ledger.", secret:"Embezzled $41,200 via Blue Flamingo. Poisoned flask at 9:38 PM.", answers:SEED_STATE.characters.c1.answers },
+      { id:"c2", name:"Rosa Vitale",        avatar:"RV", role:"CONSIGLIERE", roleColor:C.amber, position:"Angelo's Secretary", alibi:"Clearing the dining room 9:30–10:15 PM. Staff can confirm.", objective:"Protect Dom. Misdirect. In Round 4 you must stand and announce: I know something about one person at this table. Then whisper your accusation to the host who confirms the role privately to you. Use it to protect Dom.", secret:"Complicit in the embezzlement. Warned Dom about the ledger.", answers:SEED_STATE.characters.c2.answers },
+      { id:"c3", name:"Frankie Malone",     avatar:"FM", role:"LOOKOUT",     roleColor:C.blue,  position:"Driver / Enforcer", alibi:"Back corridor near cellar stairs 10:00–10:30 PM.", objective:"Stay quiet. Drop hints. Name Dom only if eliminated.", secret:"Saw Dom exit the barrel room at 10:15 PM.", answers:SEED_STATE.characters.c3.answers },
+      { id:"c4", name:"Serafina Marchetti", avatar:"SM", role:"CIVILIAN",    roleColor:C.green, position:"Angelo's Sister",   alibi:"Angelo's side during toasts, then powder room 10:00 PM.", objective:"Find your brother's killer. Watch who smiles in grief.", secret:"Angelo warned you: 'The man who smiles most in a room of grief.'", answers:SEED_STATE.characters.c4.answers },
+      { id:"c5", name:"Father Nico Avelli", avatar:"NA", role:"CIVILIAN",    roleColor:C.green, position:"Family Confessor",  alibi:"Vestibule greeting guests until 9:45 PM. Multiple witnesses.", objective:"Maintain neutrality. You heard Angelo's confession 3 wks ago.", secret:"Angelo confessed fear of betrayal — did not name the person.", answers:SEED_STATE.characters.c5.answers },
+      { id:"c6", name:"Lena Kowalski",      avatar:"LK", role:"CIVILIAN",    roleColor:C.green, position:"Jazz Singer",       alibi:"On stage 9:00–9:55 PM. Entire room witnessed.", objective:"Protect your own reputation. Angelo owed you money.", secret:"Angelo and you were having an affair. Rosa knew.", answers:SEED_STATE.characters.c6.answers },
+      { id:"c7", name:"Aldo Benedetti",     avatar:"AB", role:"CIVILIAN",    roleColor:C.green, position:"Rival Bootlegger",  alibi:"Arrived late — 10:05 PM. Car park attendant confirms.", objective:"You are the obvious suspect. Use it strategically.", secret:"You came to confront Angelo about a stolen shipment — not to kill him.", answers:SEED_STATE.characters.c7.answers },
+      { id:"c8", name:"Tommy Ricci",        avatar:"TR", role:"CIVILIAN",    roleColor:C.green, position:"Debt Collector",    alibi:"Coat room 9:45–10:10 PM. Attendant can confirm.", objective:"Collect what Angelo owed. You have invoice copies.", secret:"Audited Blue Flamingo. Noticed discrepancies but said nothing.", answers:SEED_STATE.characters.c8.answers },
+      { id:"c9", name:"Celeste Monroe",     avatar:"CM", role:"CIVILIAN",    roleColor:C.green, position:"Society Journalist",alibi:"Interviewing guests openly all evening. Notebook as proof.", objective:"Get the story. You were blackmailing Angelo over his affair.", secret:"You know about Lena. Angelo paid you to stay quiet — until last week.", answers:SEED_STATE.characters.c9.answers },
+      { id:"c10",name:"Inspector Moreau",   avatar:"VM", role:"CIVILIAN",    roleColor:C.green, position:"Corrupt Detective", alibi:"Examining the barrel room from 10:22 PM. Official capacity.", objective:"Bungle the investigation. You're on the Syndicate's payroll.", secret:"Marchetti pays your mortgage. You will not find this killer.", answers:SEED_STATE.characters.c10.answers },
     ],
     clues: [
       { id:"cl1",  round:1, type:"dispatch", time:"9:00 PM",  title:"The Gathering Begins",          text:"Angelo Marchetti has been found dead in Barrel Room No. 7. Cause of death: suspected poisoning. The Don has sealed the building. Nobody leaves.",                                                                    private:false, chars:[] },
@@ -598,10 +605,11 @@ function RoundEditor({ rounds, onChange }) {
 // ══════════════════════════════════════════════════════════════════
 // CHARACTER EDITOR
 // ══════════════════════════════════════════════════════════════════
-function CharacterEditor({ characters, onChange }) {
+function CharacterEditor({ characters, onChange, questionBank=[] }) {
   const [selected, setSelected] = useState(null);
   const [draft, setDraft]       = useState(null);
   const [addN, setAddN]         = useState(5);
+  const [showQA, setShowQA]     = useState(false);
 
   const room = Math.max(0, MAX_CHARACTERS - characters.length);
 
@@ -687,6 +695,35 @@ function CharacterEditor({ characters, onChange }) {
           <Input label="Alibi" value={draft.alibi} onChange={v=>setDraft({...draft,alibi:v})} multiline rows={2} hint="What this character tells others about their whereabouts" />
           <Input label="Objective" value={draft.objective} onChange={v=>setDraft({...draft,objective:v})} multiline rows={2} hint="Shown only to the player — their goal for the evening" />
           <Input label="Secret" value={draft.secret} onChange={v=>setDraft({...draft,secret:v})} multiline rows={2} hint="Hidden behind tap-to-reveal in the player app" />
+
+          {questionBank.length>0 && (
+            <div style={{ marginBottom:14 }}>
+              <div onClick={()=>setShowQA(x=>!x)} style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", marginBottom:showQA?10:0 }}>
+                <div style={{ fontSize:9, color:C.goldDim, fontFamily:"monospace", letterSpacing:2 }}>
+                  {showQA?"▾":"▸"} INTERROGATION ANSWERS ({questionBank.length})
+                </div>
+                <div style={{ flex:1, height:1, background:C.border }} />
+              </div>
+              {showQA && (
+                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                  {questionBank.map(q => (
+                    <div key={q.id}>
+                      <div style={{ fontSize:10, color:C.muted, marginBottom:4, lineHeight:1.5 }}>
+                        <Badge text={`R${q.round}`} color={C.gold} small /> {q.question}
+                      </div>
+                      <Input
+                        value={(draft.answers||{})[q.id] || ""}
+                        onChange={v=>setDraft({...draft, answers:{...(draft.answers||{}), [q.id]:v}})}
+                        multiline rows={2}
+                        placeholder="This character's answer..."
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <Btn onClick={save} full>Save Character</Btn>
         </Card>
       ) : (
@@ -1963,9 +2000,11 @@ function AdminPortal() {
       characters:    Object.fromEntries((scenario.characters||[]).map(c=>[c.id,{
         name:c.name, avatar:c.avatar, role:c.role,
         position:c.position, alibi:c.alibi,
-        objective:c.objective, secret:c.secret
+        objective:c.objective, secret:c.secret,
+        answers:c.answers || {}
       }])),
       clues:         scenario.clues          || [],
+      questionBank:  scenario.questionBank   || [],
     };
   }
 
@@ -2128,7 +2167,7 @@ function AdminPortal() {
             <RoundEditor rounds={scenario.rounds} onChange={r=>updateScenario({rounds:r})} />
           )}
           {activeNav==="characters" && scenario && (
-            <div><SectionHead title="Characters" /><CharacterEditor characters={scenario.characters} onChange={updateCharacters} /></div>
+            <div><SectionHead title="Characters" /><CharacterEditor characters={scenario.characters} onChange={updateCharacters} questionBank={scenario.questionBank} /></div>
           )}
           {activeNav==="clues" && scenario && (
             <div><SectionHead title="Clues & Evidence" /><ClueEditor clues={scenario.clues} characters={scenario.characters} rounds={scenario.rounds} onChange={c=>updateScenario({clues:c})} /></div>

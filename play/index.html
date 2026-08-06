@@ -280,6 +280,33 @@
       color: var(--gold); margin-bottom: 8px;
     }
 
+    /* ── Interrogation Q&A ── */
+    .interrogation-block { margin-top: 16px; }
+    .interrogation-hint {
+      font-size: 10px; color: var(--muted); line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    .qa-card {
+      background: var(--faint);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 4px; padding: 14px 16px; margin-bottom: 10px;
+    }
+    .qa-card.locked { opacity: 0.5; }
+    .qa-question {
+      font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 8px; line-height: 1.5;
+    }
+    .qa-answer {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 15px; line-height: 1.6; color: var(--cream); opacity: 0.9;
+      font-style: italic;
+    }
+    .qa-lock {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--muted);
+    }
+
     /* ── Voting tab ── */
     .voting-prompt {
       background: rgba(192,57,43,0.08);
@@ -712,6 +739,20 @@ function renderCharacter(el) {
     <div class="objective-block">
       <div class="objective-label">Your Objective</div>
       <div class="info-text">${CHAR.objective}</div>
+    </div>
+
+    <div class="interrogation-block">
+      <div class="section-title">Interrogation Answers</div>
+      <div class="interrogation-hint">Use these if another player asks — mingle and compare notes to narrow down the killer. New questions unlock as rounds advance.</div>
+      ${getQuestionsForCharacter(G, PLAYER.character).map(q => `
+        <div class="qa-card${q.unlocked ? "" : " locked"}">
+          <div class="qa-question">${q.question}</div>
+          ${q.unlocked
+            ? `<div class="qa-answer">${q.answer}</div>`
+            : `<div class="qa-lock">🔒 Unlocks in Round ${q.round}</div>`
+          }
+        </div>
+      `).join("")}
     </div>
   `;
 }

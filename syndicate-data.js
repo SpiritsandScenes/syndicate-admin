@@ -34,6 +34,24 @@ const JSONBIN_PLAYER_KEY = "$2a$10$QTGGTLCqNZE0pExx./YqgugqxH/4ljZifQc3H/t8N.nzK
 // ── Poll interval for player apps (ms) ──────────────────────────
 const POLL_INTERVAL = 4000; // 4 seconds
 
+// ── Interrogation Question Bank ──────────────────────────────────
+// Same 10 questions for every character; each unlocks at a fixed round
+// (matches the existing round/clue-dispatch gating — no separate timer).
+// Shared by index.html (admin) and play/index.html (player) so the
+// question text and round assignment live in exactly one place.
+const QUESTION_BANK = [
+  { id:"q1",  round:1, question:"Where were you between 9:30 and 10:30 PM tonight, and who can confirm it?" },
+  { id:"q2",  round:1, question:"What was your relationship with Angelo Marchetti?" },
+  { id:"q3",  round:1, question:"Did you see anyone near Barrel 7, the cellar stairs, or the back corridor tonight?" },
+  { id:"q4",  round:2, question:"Angelo's pocket watch was found stopped at 9:47 PM. Where were you at that exact time?" },
+  { id:"q5",  round:2, question:"Have you heard anything about how the poison might have gotten into Angelo's flask?" },
+  { id:"q6",  round:3, question:"Angelo was building a ledger before he died. Do you know what it was about?" },
+  { id:"q7",  round:3, question:"What's your connection to the Blue Flamingo?" },
+  { id:"q8",  round:3, question:"Did Angelo ever say he felt threatened by anyone in this family?" },
+  { id:"q9",  round:4, question:"A handkerchief monogrammed \"D.C.\" was found snagged on the barrel room door. Do those initials mean anything to you?" },
+  { id:"q10", round:5, question:"If you had to name one person in this room as the killer right now — who, and why?" },
+];
+
 // ── Seed game state (matches admin portal SEED_SCENARIOS) ───────
 const SEED_STATE = {
   scenarioId: "s1",
@@ -43,6 +61,7 @@ const SEED_STATE = {
   date: "November 3rd, 1927",
   victim: "Angelo Marchetti",
   premise: "The Marchetti Syndicate gathers for their annual closed-door meeting at The Gilded Barrel. Angelo Marchetti, the Don's heir, is found dead in Barrel Room No. 7 before dinner is served. Poisoned. His personal flask. The Don has sealed the building. Nobody leaves until the Syndicate names a killer.",
+  questionBank: QUESTION_BANK,
   currentRound: 0,        // 0 = pre-game lobby, 1-5 = active rounds, 6 = game over
   gamePhase: "lobby",     // "lobby" | "round" | "voting" | "eliminated" | "ended"
   votingOpen: false,
@@ -59,16 +78,136 @@ const SEED_STATE = {
     { id:"p6", name:"Tom Alcott",     code:"CASK-4420", character:"c8", joined:false },
   ],
   characters: {
-    c1:  { name:"Dominic Caruso",     avatar:"DC", role:"KILLER",      position:"Head of Finances",   alibi:"At the bar 10:00–10:20 PM. Barman confirms — imprecisely.", objective:"Survive all 5 rounds. In Round 2, state as fact: Aldo Benedetti threatened Angelo two weeks ago. I heard it myself.", secret:"Embezzled $41,200 via Blue Flamingo. Poisoned flask at 9:38 PM." },
-    c2:  { name:"Rosa Vitale",        avatar:"RV", role:"CONSIGLIERE", position:"Angelo's Secretary",  alibi:"Clearing the dining room 9:30–10:15 PM. Staff can confirm.", objective:"Protect Dom. In Round 4 announce: I know something about one person at this table. Whisper your accusation to the host.", secret:"Complicit in the embezzlement. Warned Dom about the ledger." },
-    c3:  { name:"Frankie Malone",     avatar:"FM", role:"LOOKOUT",     position:"Driver / Enforcer",   alibi:"Back corridor near cellar stairs 10:00–10:30 PM.", objective:"Stay quiet. Drop hints. Name Dom only if eliminated.", secret:"Saw Dom exit the barrel room at 10:15 PM." },
-    c4:  { name:"Serafina Marchetti", avatar:"SM", role:"CIVILIAN",    position:"Angelo's Sister",     alibi:"Angelo's side during toasts, then powder room 10:00 PM.", objective:"Find your brother's killer. Watch who smiles in grief.", secret:"Angelo warned you: the man who smiles most in a room of grief." },
-    c5:  { name:"Father Nico Avelli", avatar:"NA", role:"CIVILIAN",    position:"Family Confessor",    alibi:"Vestibule greeting guests until 9:45 PM. Multiple witnesses.", objective:"Maintain neutrality. You heard Angelo's confession 3 weeks ago.", secret:"Angelo confessed fear of betrayal — did not name the person." },
-    c6:  { name:"Lena Kowalski",      avatar:"LK", role:"CIVILIAN",    position:"Jazz Singer",         alibi:"On stage 9:00–9:55 PM. Entire room witnessed.", objective:"Protect your reputation. Angelo owed you money.", secret:"Angelo and you were having an affair. Rosa knew." },
-    c7:  { name:"Aldo Benedetti",     avatar:"AB", role:"CIVILIAN",    position:"Rival Bootlegger",    alibi:"Arrived late — 10:05 PM. Car park attendant confirms.", objective:"You are the obvious suspect. Use it strategically.", secret:"You came to confront Angelo about a stolen shipment — not to kill him." },
-    c8:  { name:"Tommy Ricci",        avatar:"TR", role:"CIVILIAN",    position:"Debt Collector",      alibi:"Coat room 9:45–10:10 PM. Attendant can confirm.", objective:"Collect what Angelo owed. You have invoice copies.", secret:"Audited Blue Flamingo. Noticed discrepancies but said nothing." },
-    c9:  { name:"Celeste Monroe",     avatar:"CM", role:"CIVILIAN",    position:"Society Journalist",  alibi:"Interviewing guests openly all evening. Notebook as proof.", objective:"Get the story. You were blackmailing Angelo over his affair.", secret:"You know about Lena. Angelo paid you — until last week." },
-    c10: { name:"Inspector Moreau",   avatar:"VM", role:"CIVILIAN",    position:"Corrupt Detective",   alibi:"Examining the barrel room from 10:22 PM. Official capacity.", objective:"Bungle the investigation. You are on the Syndicate's payroll.", secret:"Marchetti pays your mortgage. You will not find this killer." },
+    c1:  { name:"Dominic Caruso",     avatar:"DC", role:"KILLER",      position:"Head of Finances",   alibi:"At the bar 10:00–10:20 PM. Barman confirms — imprecisely.", objective:"Survive all 5 rounds. In Round 2, state as fact: Aldo Benedetti threatened Angelo two weeks ago. I heard it myself.", secret:"Embezzled $41,200 via Blue Flamingo. Poisoned flask at 9:38 PM.",
+      answers: {
+        q1:"Bar, getting a double bourbon, ten to ten-twenty. The barman will vouch for me — busy night, though, so don't expect a stopwatch.",
+        q2:"Twelve years running this family's books. I respected Angelo. Meticulous man. We didn't always agree, but I never doubted his loyalty to his father.",
+        q3:"No — I was at the bar most of that window. You'd want to ask whoever was actually back there.",
+        q4:"Bar. Bourbon in hand. Same answer.",
+        q5:"I wouldn't know the first thing about arsenic, pharmaceutical or otherwise. That's not exactly a finance skill.",
+        q6:"I understand why it's alarming. But Angelo was building a case against a rival, from what I gather. Couldn't this have been planted — a rival family trying to frame someone inside ours?",
+        q7:"My wife runs that club. I help with the books occasionally, like I help with everyone's books. I'd want to see these 'records' myself before I take them at face value.",
+        q8:"If he did, he never said so to me. We spoke plenty, but not about fear.",
+        q9:"Delia. Delia Corsetti — my cousin. She was here the first hour, you may not have crossed paths. The handkerchief's hers, I'd imagine.",
+        q10:"I've been with this family twelve years. If I wanted to steal — or worse — I'd have done it smarter than whatever's being described here tonight.",
+      } },
+    c2:  { name:"Rosa Vitale",        avatar:"RV", role:"CONSIGLIERE", position:"Angelo's Secretary",  alibi:"Clearing the dining room 9:30–10:15 PM. Staff can confirm.", objective:"Protect Dom. In Round 4 announce: I know something about one person at this table. Whisper your accusation to the host.", secret:"Complicit in the embezzlement. Warned Dom about the ledger.",
+      answers: {
+        q1:"Private dining room, arranging Angelo's presentation materials, 9:30 to 10:30. Two waiters passed through — they can place me there, though not every minute.",
+        q2:"Seven years as his secretary. His calendar, his correspondence, his confidence. He was like family to me.",
+        q3:"I wasn't anywhere near there myself. I couldn't say who else was.",
+        q4:"Still in the dining room, I believe. It's a blur — that whole hour is a blur now.",
+        q5:"I have no idea. I handle correspondence, not chemistry.",
+        q6:"I've seen that ledger. I handled Angelo's correspondence for seven years — I know his handwriting. Those final entries are wrong. That document has been tampered with.",
+        q7:"I don't manage the club's books. You'd have to ask someone closer to that operation.",
+        q8:"He was tense in his final weeks, yes. He didn't confide the specifics in me — or if he did, I've chosen to let him keep that privacy, even now.",
+        q9:"No idea. Doesn't match anyone I know well.",
+        q10:"With respect — look at who benefits from chaos in this family. Aldo Benedetti walked in uninvited, and now the heir is dead. Think about that.",
+      } },
+    c3:  { name:"Frankie Malone",     avatar:"FM", role:"LOOKOUT",     position:"Driver / Enforcer",   alibi:"Back corridor near cellar stairs 10:00–10:30 PM.", objective:"Stay quiet. Drop hints. Name Dom only if eliminated.", secret:"Saw Dom exit the barrel room at 10:15 PM.",
+      answers: {
+        q1:"Back corridor, near the cellar stairs. Ten to ten-thirty. Needed some air.",
+        q2:"Angelo was good to me. Treated me like a person, not just muscle. That's all I'm gonna say. Angelo was good to me.",
+        q3:"Look — there's things in this building tonight that are above my pay grade, all right? I'm not saying I saw nothing. I'm saying I'm not stupid enough to say what I saw in a room full of people I don't trust.",
+        q4:"...I was already back there by then. Can't say more.",
+        q5:"No idea. Wish I did.",
+        q6:"Angelo mentioned things to me sometimes. I keep those to myself.",
+        q7:"Not my business, that club.",
+        q8:"He was careful the last few days. More careful than usual. Didn't say why.",
+        q9:"Couldn't tell you whose that is.",
+        q10:"I can't. You don't understand what they'd do to me. (If eliminated, this unlocks full testimony naming Dom — per app design.)",
+      } },
+    c4:  { name:"Serafina Marchetti", avatar:"SM", role:"CIVILIAN",    position:"Angelo's Sister",     alibi:"Angelo's side during toasts, then powder room 10:00 PM.", objective:"Find your brother's killer. Watch who smiles in grief.", secret:"Angelo warned you: the man who smiles most in a room of grief.",
+      answers: {
+        q1:"At Angelo's side during the toasts, then the powder room from about 10:00 until Pietro raised the alarm. I have no reason to hurt my own brother.",
+        q2:"He was my protector. My confidant. The only person in this family who ever made me feel safe.",
+        q3:"I wasn't near there — I was in the powder room, falling apart.",
+        q4:"Still with Angelo during the toasts, or just after. I can't be exact.",
+        q5:"I don't know anything about that.",
+        q6:"I know he kept one. He mentioned it obliquely back in October — never showed me what was in it.",
+        q7:"I don't involve myself in the club's business.",
+        q8:"He was troubled in the weeks before tonight — watchful, guarded in a way that wasn't like him. He told me once that if anything ever happened to him, I should watch for whoever seemed calmest about it. Grief makes people careless. He didn't trust calm.",
+        q9:"No. Doesn't mean anything to me.",
+        q10:"My brother told me who to watch, and I've been watching. Dom, you've barely shed a tear tonight. You knew him twelve years. Doesn't that strike anyone else as strange?",
+      } },
+    c5:  { name:"Father Nico Avelli", avatar:"NA", role:"CIVILIAN",    position:"Family Confessor",    alibi:"Vestibule greeting guests until 9:45 PM. Multiple witnesses.", objective:"Maintain neutrality. You heard Angelo's confession 3 weeks ago.", secret:"Angelo confessed fear of betrayal — did not name the person.",
+      answers: {
+        q1:"The chapel, from a quarter past nine onward. Multiple guests can place me there — I was receiving anyone who wanted a quiet moment.",
+        q2:"He came to confession regularly. Not a good man by most measures, but he had a conscience. I'll miss him.",
+        q3:"I didn't leave the chapel, so I can't say.",
+        q4:"Still in the chapel, with witnesses.",
+        q5:"That's not knowledge I'd have.",
+        q6:"I can't speak to its contents. But I'll say this — not everyone in this room is as surprised by Angelo's death as they appear.",
+        q7:"None that I know of.",
+        q8:"Three weeks ago, someone came to me — not in confession — and asked, hypothetically, whether stopping a man from destroying everything the family built could be called protection. I told him no. I'm telling you now.",
+        q9:"That cologne is bergamot. Italian import, uncommon. Someone at this gathering wears it. I have a very good memory for such things.",
+        q10:"I cannot speak of what I've heard in confidence. But justice and truth aren't always the same thing here — and I believe I know which one this room needs.",
+      } },
+    c6:  { name:"Lena Kowalski",      avatar:"LK", role:"CIVILIAN",    position:"Jazz Singer",         alibi:"On stage 9:00–9:55 PM. Entire room witnessed.", objective:"Protect your reputation. Angelo owed you money.", secret:"Angelo and you were having an affair. Rosa knew.",
+      answers: {
+        q1:"Dressing room, preparing for my second set. Nine-forty onward.",
+        q2:"I knew Angelo. Better than most people in this room realize. He was afraid, the last few weeks. I noticed.",
+        q3:"Not from the dressing room, no.",
+        q4:"Still getting ready. The walls are thin back there, if that matters.",
+        q5:"No idea.",
+        q6:"I don't know what was in it.",
+        q7:"I sing there three nights a week. That's the extent of it.",
+        q8:"I know things about Angelo nobody else in this room knows. And yes — he was afraid, in the weeks before tonight. I'm not ready to say more than that.",
+        q9:"I was in the dressing room at 9:40. I heard two men arguing in the corridor outside. One of them was Angelo. He said, 'You had your chance, Dom. Tonight it ends. Papa will know by midnight.' I heard the name clearly. It was Dom.",
+        q10:"He said a name, in that corridor, right before he died. The name was Dom. I've been afraid to say it all night. I'm saying it now.",
+      } },
+    c7:  { name:"Aldo Benedetti",     avatar:"AB", role:"CIVILIAN",    position:"Rival Bootlegger",    alibi:"Arrived late — 10:05 PM. Car park attendant confirms.", objective:"You are the obvious suspect. Use it strategically.", secret:"You came to confront Angelo about a stolen shipment — not to kill him.",
+      answers: {
+        q1:"I arrived twelve minutes late to the toasts. I was in the car park — an argument, nothing to do with the murder.",
+        q2:"I hated Angelo. Professional rivalry — he burned my warehouse, I bribed his contacts. I didn't know him well enough to want him personally dead.",
+        q3:"I wasn't even in the building yet — ask anyone.",
+        q4:"Still outside. That argument ran long.",
+        q5:"Wouldn't know.",
+        q6:"No idea what's in it.",
+        q7:"None of my business, that club.",
+        q8:"Someone pulled me aside before I even walked in tonight and told me to keep my head down, stay quiet, not ask questions. I didn't understand why at the time. I'm starting to.",
+        q9:"Doesn't mean anything to me. I just got here twelve minutes late to my own humiliation.",
+        q10:"Dom Caruso pulled me aside in the car park. Before the body was even found. He said keep my head down. Then he said — after tonight there'd be 'an opening in the Family,' and he intended to make sure it got filled by the right person. Who says that about a man who isn't dead yet?",
+      } },
+    c8:  { name:"Tommy Ricci",        avatar:"TR", role:"CIVILIAN",    position:"Debt Collector",      alibi:"Coat room 9:45–10:10 PM. Attendant can confirm.", objective:"Collect what Angelo owed. You have invoice copies.", secret:"Audited Blue Flamingo. Noticed discrepancies but said nothing.",
+      answers: {
+        q1:"Main bar, all night. Plenty of people can confirm it. Had a conversation with Inspector Moreau around 9:50. Never went near the cellar.",
+        q2:"Respected him more than most bosses I've worked for. He was straight with me.",
+        q3:"Not from where I was standing. The bar's a good distance from the cellar.",
+        q4:"At the bar, talking with Moreau. Solid on that one.",
+        q5:"Not my department. I collect debts, I don't mix chemicals.",
+        q6:"I know Angelo was building something. He asked me to sit on some numbers back in June — told me he was putting together a bigger case. I did what he asked.",
+        q7:"I audited those accounts in June, at Angelo's request. Found invoices — real money, no real suppliers behind them. Whoever's running that skim, it's someone with signing authority close to the family. I'm not naming names yet — I want to see the documents on the table first.",
+        q8:"He was watchful, careful with what he said. He trusted me enough to hand me a job he didn't want traced back to him. That tells you something.",
+        q9:"Doesn't ring a bell by itself. But since we're laying evidence side by side — those Blue Flamingo invoices I mentioned? All three signed by Dom Caruso. Draw your own line from there.",
+        q10:"I deal in facts, not speculation. The invoices are signed by Dom Caruso. That's not circumstantial. That's a signature.",
+      } },
+    c9:  { name:"Celeste Monroe",     avatar:"CM", role:"CIVILIAN",    position:"Society Journalist",  alibi:"Interviewing guests openly all evening. Notebook as proof.", objective:"Get the story. You were blackmailing Angelo over his affair.", secret:"You know about Lena. Angelo paid you — until last week.",
+      answers: {
+        q1:"Circulating the main hall all evening, champagne in hand, observing. Spoke with Inspector Moreau around 9:55 — he doesn't know I'm press.",
+        q2:"I was investigating a separate story about Angelo — an allegation involving payments to Alderman Krebs. That's now considerably more complicated.",
+        q3:"I watch rooms carefully — habit of the trade. Dom Caruso left the main hall around 9:50 and didn't return until roughly 10:18. Twenty-eight minutes. I noticed because it's exactly the kind of gap a story needs.",
+        q4:"Right in the middle of Dom's absence, by my count.",
+        q5:"Not my area of expertise.",
+        q6:"I noted that Rosa Vitale was one of the last people to speak privately with Angelo before he disappeared. Make of that what you will.",
+        q7:"No direct knowledge — but I'd be very interested to see those records myself.",
+        q8:"He was paying off Alderman Krebs to keep this place running — two thousand a month. Unrelated to the murder, but it tells you the kind of pressure he was under generally.",
+        q9:"I didn't see who it belongs to. But it's exactly the kind of detail a good notebook would already have noted.",
+        q10:"Twenty-eight unaccounted-for minutes, an inspector whose investigation is designed to protect this family rather than solve anything, and a woman who spoke to the victim privately right before he vanished. I know where I'd look.",
+      } },
+    c10: { name:"Inspector Moreau",   avatar:"VM", role:"CIVILIAN",    position:"Corrupt Detective",   alibi:"Examining the barrel room from 10:22 PM. Official capacity.", objective:"Bungle the investigation. You are on the Syndicate's payroll.", secret:"Marchetti pays your mortgage. You will not find this killer.",
+      answers: {
+        q1:"I've been 'investigating' all evening — talked to nearly every guest in this room. Ask any of them. I was never out of sight for long.",
+        q2:"Met him twice at family functions. Polite man. Knew exactly what I was and didn't hold it against me — which somehow made it worse.",
+        q3:"No one specific. I was circulating, not watching the cellar.",
+        q4:"Talking to Aldo Benedetti, if memory serves — around then, at least.",
+        q5:"The toxicology report is genuine, for what it's worth — Dr. Faust doesn't adjust his findings for anyone. Pharmaceutical grade arsenic. That's not something you pick up on a street corner. Someone with money and the right connections got their hands on it.",
+        q6:"I've heard whispers Angelo was building something. Wasn't briefed on details.",
+        q7:"There's a pharmacist — Sal Greco — with a flagged history of irregular arsenic dispensing. And there's an account at the Blue Flamingo under the name 'Greco Medical.' I flagged that account eighteen months ago and was told to drop it. I'm not dropping it tonight.",
+        q8:"Not that he told me directly. But I clocked something odd earlier — that reporter, Celeste Monroe, isn't who she says she is. I've been sitting on that.",
+        q9:"Doesn't ring a bell. But I'd want to know who was near that door between nine and ten-thirty.",
+        q10:"I was told before tonight to point this at Aldo Benedetti. I'm done doing that. The evidence — the toxicology, the account, the timeline — it all sits on one man. Dom Caruso.",
+      } },
   },
   clues: [
     { id:"cl1",   round:1, type:"dispatch", private:false, chars:[],      title:"The Gathering Begins",              text:"Angelo Marchetti has been found dead in Barrel Room No. 7. Cause of death: suspected poisoning. The Don has sealed the building. Nobody leaves." },
@@ -268,6 +407,19 @@ function getCluesForPlayer(state, charId) {
     if (!state.dispatchedClues.includes(cl.id)) return false;
     if (cl.private) return cl.chars.includes(charId);
     return true;
+  });
+}
+
+// Interrogation questions for a character, in bank order, each tagged with
+// whether it's unlocked yet (round <= current round) and, only if so, this
+// character's answer. Locked questions come back with answer:null so the UI
+// can show the prompt greyed out without ever leaking the answer early.
+function getQuestionsForCharacter(state, charId) {
+  const round = state.currentRound || 0;
+  const char = state.characters[charId];
+  return (state.questionBank || []).map(q => {
+    const unlocked = round >= q.round;
+    return { ...q, unlocked, answer: unlocked ? (char?.answers?.[q.id] || "") : null };
   });
 }
 
