@@ -84,7 +84,7 @@
       background: rgba(6,5,10,0.97);
       backdrop-filter: blur(12px);
       border-top: 1px solid var(--border);
-      display: grid; grid-template-columns: repeat(4, 1fr);
+      display: grid; grid-template-columns: repeat(5, 1fr);
       height: 58px;
       padding-bottom: env(safe-area-inset-bottom, 0px);
     }
@@ -281,7 +281,6 @@
     }
 
     /* ── Interrogation Q&A ── */
-    .interrogation-block { margin-top: 16px; }
     .interrogation-hint {
       font-size: 10px; color: var(--muted); line-height: 1.6;
       margin-bottom: 12px;
@@ -601,6 +600,11 @@ function render() {
         <span class="nav-label">Evidence</span>
         ${getNewClueCount() > 0 ? `<span class="nav-badge">${getNewClueCount()}</span>` : ""}
       </button>
+      <button class="nav-tab${activeTab==="qa"?"  active":""}" onclick="switchTab('qa')">
+        <span class="nav-icon">❓</span>
+        <span class="nav-label">Q&amp;A</span>
+        ${getNewQuestionCount() > 0 ? `<span class="nav-badge">${getNewQuestionCount()}</span>` : ""}
+      </button>
       <button class="nav-tab${activeTab==="character"?" active":""}" onclick="switchTab('character')">
         <span class="nav-icon">🎭</span>
         <span class="nav-label">Character</span>
@@ -630,15 +634,25 @@ function markCluesSeen() {
   localStorage.setItem("seen-clues-"+CODE, JSON.stringify([...seenClues]));
 }
 
+let seenQuestions = new Set(JSON.parse(localStorage.getItem("seen-questions-"+CODE)||"[]"));
+function getNewQuestionCount() {
+  return getQuestionsForCharacter(G, PLAYER.character).filter(q => q.unlocked && !seenQuestions.has(q.id)).length;
+}
+function markQuestionsSeen() {
+  getQuestionsForCharacter(G, PLAYER.character).filter(q=>q.unlocked).forEach(q => seenQuestions.add(q.id));
+  localStorage.setItem("seen-questions-"+CODE, JSON.stringify([...seenQuestions]));
+}
+
 function switchTab(tab) {
   activeTab = tab;
   if (tab === "clues") markCluesSeen();
+  if (tab === "qa") markQuestionsSeen();
   renderTab();
   // Update active state on nav buttons
   document.querySelectorAll(".nav-tab").forEach(btn => {
     btn.classList.remove("active");
   });
-  const tabs = ["clues","character","vote","suspects"];
+  const tabs = ["clues","qa","character","vote","suspects"];
   const idx = tabs.indexOf(tab);
   const navBtns = document.querySelectorAll(".nav-tab");
   if (navBtns[idx]) navBtns[idx].classList.add("active");
@@ -647,8 +661,11 @@ function switchTab(tab) {
   if (getNewClueCount() > 0 && tab !== "clues") {
     navBtns[0]?.insertAdjacentHTML("beforeend",`<span class="nav-badge">${getNewClueCount()}</span>`);
   }
+  if (getNewQuestionCount() > 0 && tab !== "qa") {
+    navBtns[1]?.insertAdjacentHTML("beforeend",`<span class="nav-badge">${getNewQuestionCount()}</span>`);
+  }
   if (G.votingOpen && !myVotes[G.currentRound] && tab !== "vote") {
-    navBtns[2]?.insertAdjacentHTML("beforeend",`<span class="nav-badge">!</span>`);
+    navBtns[3]?.insertAdjacentHTML("beforeend",`<span class="nav-badge">!</span>`);
   }
 }
 
@@ -656,6 +673,7 @@ function renderTab() {
   const tc = document.getElementById("tab-content");
   if (!tc) return;
   if (activeTab === "clues")     renderClues(tc);
+  else if (activeTab === "qa")        renderQA(tc);
   else if (activeTab === "character") renderCharacter(tc);
   else if (activeTab === "vote")      renderVote(tc);
   else if (activeTab === "suspects")  renderSuspects(tc);
@@ -740,20 +758,24 @@ function renderCharacter(el) {
       <div class="objective-label">Your Objective</div>
       <div class="info-text">${CHAR.objective}</div>
     </div>
+  `;
+}
 
-    <div class="interrogation-block">
-      <div class="section-title">Interrogation Answers</div>
-      <div class="interrogation-hint">Use these if another player asks — mingle and compare notes to narrow down the killer. New questions unlock as rounds advance.</div>
-      ${getQuestionsForCharacter(G, PLAYER.character).map(q => `
-        <div class="qa-card${q.unlocked ? "" : " locked"}">
-          <div class="qa-question">${q.question}</div>
-          ${q.unlocked
-            ? `<div class="qa-answer">${q.answer}</div>`
-            : `<div class="qa-lock">🔒 Unlocks in Round ${q.round}</div>`
-          }
-        </div>
-      `).join("")}
-    </div>
+// ── Q&A TAB ──────────────────────────────────────────────────────
+function renderQA(el) {
+  markQuestionsSeen();
+  el.innerHTML = `
+    <div class="section-title">Interrogation Answers</div>
+    <div class="interrogation-hint">Use these if another player asks — mingle and compare notes to narrow down the killer. New questions unlock as rounds advance.</div>
+    ${getQuestionsForCharacter(G, PLAYER.character).map(q => `
+      <div class="qa-card${q.unlocked ? "" : " locked"}">
+        <div class="qa-question">${q.question}</div>
+        ${q.unlocked
+          ? `<div class="qa-answer">${q.answer}</div>`
+          : `<div class="qa-lock">🔒 Unlocks in Round ${q.round}</div>`
+        }
+      </div>
+    `).join("")}
   `;
 }
 
