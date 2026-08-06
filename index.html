@@ -1629,11 +1629,21 @@ function LiveControls({ scenario, onChange, onToast }) {
 function PreviewMode({ scenario }) {
   const [previewChar, setPreviewChar] = useState(scenario.characters[0]?.id||null);
   const [previewRound, setPreviewRound] = useState(1);
+  const [previewTab, setPreviewTab] = useState("clues"); // "clues" | "character"
   const [filter, setFilter]         = useState("all");
   const [expanded, setExpanded]     = useState(null);
 
   const char = scenario.characters.find(c=>c.id===previewChar);
   const TC = { dispatch:C.gold, evidence:C.red, private:C.purp, tip:"#608060", final:C.amber };
+
+  // Reuses the same round-gating helper the real play page uses, fed a
+  // minimal fake state — so Preview can never drift from what players
+  // actually see.
+  const previewQuestions = getQuestionsForCharacter(
+    { currentRound: previewRound, questionBank: scenario.questionBank || [],
+      characters: Object.fromEntries(scenario.characters.map(c=>[c.id,c])) },
+    previewChar
+  );
 
   const visibleClues = scenario.clues.filter(c => {
     if (c.round > previewRound) return false;
@@ -1705,6 +1715,54 @@ function PreviewMode({ scenario }) {
             <div style={{ fontSize:9, color:C.cream, fontFamily:"monospace", fontWeight:"bold", letterSpacing:2 }}>THE SYNDICATE</div>
             <div style={{ display:"flex", gap:2 }}>{[1,2,3].map(i=><div key={i} style={{ width:4,height:4,borderRadius:"50%",background:C.gold }} />)}</div>
           </div>
+          {/* Preview tab switcher — mirrors the real play app's bottom nav */}
+          <div style={{ display:"flex", borderBottom:"1px solid #2A1A08" }}>
+            {[{k:"clues",label:"📜 Evidence"},{k:"character",label:"🎭 Character"}].map(t=>(
+              <button key={t.k} onClick={()=>setPreviewTab(t.k)} style={{
+                flex:1, padding:"8px 0", background:previewTab===t.k?"rgba(201,168,76,0.1)":"none",
+                border:"none", borderBottom:previewTab===t.k?`2px solid ${C.gold}`:"2px solid transparent",
+                color:previewTab===t.k?C.gold:"#5A4A30", fontSize:9, fontFamily:"monospace",
+                letterSpacing:1, cursor:"pointer", textTransform:"uppercase",
+              }}>{t.label}</button>
+            ))}
+          </div>
+          {previewTab==="character" ? (
+            <div style={{ maxHeight:460, overflowY:"auto", padding:"14px 14px 20px" }}>
+              {char ? (
+                <>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                    <div style={{ width:40, height:40, borderRadius:"50%", background:`${ROLE_COLORS[char.role]||C.green}22`, border:`2px solid ${ROLE_COLORS[char.role]||C.green}66`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, color:C.cream, fontWeight:"bold", flexShrink:0 }}>{char.avatar}</div>
+                    <div>
+                      <div style={{ fontSize:14, color:C.cream, fontWeight:"700", fontFamily:"'Playfair Display',serif" }}>{char.name}</div>
+                      <div style={{ fontSize:9, color:"#7A5F28", fontFamily:"monospace" }}>{char.position}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:8, color:"#7A5F28", fontFamily:"monospace", letterSpacing:1, marginBottom:4 }}>ALIBI</div>
+                  <div style={{ fontSize:11, color:"#C8B890", marginBottom:12, lineHeight:1.5, fontStyle:"italic" }}>{char.alibi}</div>
+                  <div style={{ fontSize:8, color:"#B080D0", fontFamily:"monospace", letterSpacing:1, marginBottom:4 }}>🔒 SECRET</div>
+                  <div style={{ fontSize:11, color:"#C0A0E0", marginBottom:12, lineHeight:1.5, fontStyle:"italic" }}>{char.secret}</div>
+                  <div style={{ fontSize:8, color:C.gold, fontFamily:"monospace", letterSpacing:1, marginBottom:4 }}>OBJECTIVE</div>
+                  <div style={{ fontSize:11, color:"#C8B890", marginBottom:18, lineHeight:1.5, fontStyle:"italic" }}>{char.objective}</div>
+
+                  <div style={{ fontSize:12, color:C.cream, fontWeight:"700", fontFamily:"'Playfair Display',serif", marginBottom:10 }}>Interrogation Answers</div>
+                  {previewQuestions.length===0 ? (
+                    <div style={{ textAlign:"center", padding:"24px 0", color:"#3A2A10", fontStyle:"italic", fontSize:12 }}>No question bank set for this scenario yet.</div>
+                  ) : previewQuestions.map(q => (
+                    <div key={q.id} style={{ background:q.unlocked?"#120A02":"#0D0803", opacity:q.unlocked?1:0.5, border:"1px solid #2A1A08", borderRadius:4, padding:"9px 12px", marginBottom:7 }}>
+                      <div style={{ fontSize:9, color:C.gold, letterSpacing:0.5, marginBottom:6, lineHeight:1.4, textTransform:"uppercase" }}>{q.question}</div>
+                      {q.unlocked
+                        ? <div style={{ fontSize:11, color:"#C8B890", lineHeight:1.5, fontStyle:"italic" }}>{q.answer}</div>
+                        : <div style={{ fontSize:8, color:"#5A4A30", fontFamily:"monospace", letterSpacing:1, textTransform:"uppercase" }}>🔒 Unlocks in Round {q.round}</div>
+                      }
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div style={{ textAlign:"center", padding:"32px 16px", color:"#3A2A10", fontStyle:"italic", fontSize:12 }}>Select a character above.</div>
+              )}
+            </div>
+          ) : (
+          <>
           {/* Feed header */}
           <div style={{ padding:"10px 14px 8px", borderBottom:"1px solid #2A1A08" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
@@ -1756,6 +1814,8 @@ function PreviewMode({ scenario }) {
               ))
             )}
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
