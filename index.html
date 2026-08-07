@@ -921,7 +921,7 @@ function ClueEditor({ clues, characters, rounds, onChange }) {
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
             <Select label="Round" value={String(draft.round)} onChange={v=>setDraft({...draft,round:Number(v)})} options={rounds.map(r=>({value:String(r.round),label:`Round ${r.round} — ${r.title}`}))} />
             <Select label="Type" value={draft.type} onChange={v=>setDraft({...draft,type:v,private:v==="private"||v==="final"})} options={CLUE_TYPES.map(t=>({value:t,label:t}))} />
-            <Input label="Time" value={draft.time} onChange={v=>setDraft({...draft,time:v})} placeholder="9:00 PM" />
+            <Input label="In-Story Time" value={draft.time} onChange={v=>setDraft({...draft,time:v})} placeholder="9:00 PM" hint="Narrative flavor only — shown on the clue card, not a dispatch schedule" />
           </div>
           <Input label="Title" value={draft.title} onChange={v=>setDraft({...draft,title:v})} />
           <Input label="Clue Text" value={draft.text} onChange={v=>setDraft({...draft,text:v})} multiline rows={4} hint="Exactly as it will appear on the player's device" />
